@@ -704,15 +704,7 @@ export class ApiService {
     })
   }
 
-  static async testGoogleConnection() {
-    if (!this.lineUserId) {
-      this.bootstrapLineUserId()
-    }
-    return this.request('/sync/test-connection/', {
-      method: 'POST',
-      body: JSON.stringify({ line_user_id: this.lineUserId })
-    })
-  }
+
 
   static async triggerAutoSync() {
     if (!this.lineUserId) {

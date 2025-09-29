@@ -48,7 +48,7 @@ export function GoogleAuthManager({
 
       if (showClassroomSync) {
         try {
-          const classroomResponse = await ApiService.testGoogleConnection()
+          const classroomResponse = await ApiService.getGoogleApiStatus()
           classroomConnected = classroomResponse.data?.is_connected || false
         } catch (error) {
           console.error('Classroom 連接測試失敗:', error)

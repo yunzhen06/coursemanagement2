@@ -104,7 +104,7 @@ export function useGoogleAuth() {
               window.removeEventListener('message', handleMessage)
               setTimeout(async () => {
                 try {
-                  const response = await ApiService.testGoogleConnection()
+                  const response = await ApiService.getGoogleApiStatus()
                   if (response.data && (response.data as any).is_connected) {
                     const userEmail = 'user@gmail.com'
                     setAuthorized(true, userEmail)
@@ -146,7 +146,7 @@ export function useGoogleAuth() {
 
   const checkAuthStatus = useCallback(async () => {
     try {
-      const response = await ApiService.testGoogleConnection()
+      const response = await ApiService.getGoogleApiStatus()
       if (response.data && (response.data as any).is_connected) {
         setAuthorized(true, 'user@gmail.com') // 模擬 email
         return true

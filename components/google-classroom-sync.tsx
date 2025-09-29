@@ -106,7 +106,7 @@ export function GoogleClassroomSync({ onSync }: GoogleClassroomSyncProps) {
 
   const handleTestConnection = async () => {
     try {
-      const response = await ApiService.testGoogleConnection()
+      const response = await ApiService.getGoogleApiStatus()
       if (response.data) {
         const data = response.data as any
         setIsConnected(data.is_connected || false)

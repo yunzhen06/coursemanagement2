@@ -125,7 +125,7 @@ export function GoogleCalendarSync({ onSync }: GoogleCalendarSyncProps) {
     setErrorMessage(null)
 
     try {
-      const response = await ApiService.testGoogleConnection()
+      const response = await ApiService.getGoogleApiStatus()
       if (response.error) {
         setErrorMessage(response.error)
         setIsConnected(false)

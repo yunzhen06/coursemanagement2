@@ -78,7 +78,7 @@ export function GoogleAuth({ onAuthSuccess, onAuthError }: GoogleAuthProps) {
           // 檢查授權狀態
           setTimeout(async () => {
             try {
-              const response = await ApiService.testGoogleConnection()
+              const response = await ApiService.getGoogleApiStatus()
               if (response.data && (response.data as any).is_connected) {
                 setIsAuthorized(true)
                 onAuthSuccess?.()
