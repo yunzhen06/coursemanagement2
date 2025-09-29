@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useRegistrationFlow } from '@/hooks/use-registration-flow'
 import { ApiService } from '@/services/apiService'
@@ -11,9 +11,9 @@ import { RegistrationRoleSelection } from '@/components/registration-role-select
 import { RegistrationNameInput } from '@/components/registration-name-input'
 import { RegistrationGoogleAuth } from '@/components/registration-google-auth'
 import { Card, CardContent } from '@/components/ui/card'
-import { CheckCircle, Loader2 } from 'lucide-react'
+import { CheckCircle, Loader2, Heart, BookOpen, Users } from 'lucide-react'
 import { closeLiffWindow } from '@/lib/line-liff'
-// import { Button } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 
 export default function RegistrationPage() {
   const router = useRouter()
@@ -36,7 +36,10 @@ export default function RegistrationPage() {
     lineUser
   } = useRegistrationFlow()
 
-  // 不再自動重定向，讓註冊頁面處理 LINE 登入流程
+  // 狀態管理
+  const [registrationStatus, setRegistrationStatus] = useState<'checking' | 'registered' | 'not_registered' | 'error'>('checking')
+  const [userProfile, setUserProfile] = useState<any>(null)
+  const hasCheckedRef = useRef(false)
 
   // 已註冊使用者導向守衛：若已綁定則離開註冊頁
   const uidMemo = useMemo(() => {
@@ -44,29 +47,42 @@ export default function RegistrationPage() {
     return uid || ''
   }, [lineUser?.userId])
 
-  const didCheckRef = useRef(false)
-
   useEffect(() => {
-    const checkRegistered = async () => {
+    const checkRegistrationOnce = async () => {
+      if (hasCheckedRef.current || !uidMemo) return
+      
+      hasCheckedRef.current = true
+      setRegistrationStatus('checking')
+      
       try {
-        const uid = uidMemo
-        if (!uid) return
         // 確保後續 API 請求帶入正確的 LINE 使用者 ID
-        try { ApiService.setLineUserId(uid) } catch {}
-        const registered = await UserService.getOnboardStatus(uid)
+        try { ApiService.setLineUserId(uidMemo) } catch {}
+        
+        const registered = await UserService.getOnboardStatus(uidMemo)
+        
         if (registered) {
-          router.replace('/line')
+          // 已註冊，獲取用戶資料
+          try {
+            const profile = await UserService.getUserByLineId(uidMemo)
+            setUserProfile(profile)
+            setRegistrationStatus('registered')
+          } catch (profileError) {
+            console.error('獲取用戶資料失敗:', profileError)
+            setRegistrationStatus('registered') // 仍然顯示已註冊狀態
+          }
+        } else {
+          setRegistrationStatus('not_registered')
         }
       } catch (e) {
-        // 忽略錯誤，保持在註冊頁
+        console.error('檢查註冊狀態失敗:', e)
+        setRegistrationStatus('error')
       }
     }
-    // 僅在第一次渲染且取得有效 LINE 使用者 ID 時檢查；避免嚴格模式造成的重複執行
-    if (!didCheckRef.current && uidMemo) {
-      didCheckRef.current = true
-      checkRegistered()
-    }
+
+    checkRegistrationOnce()
   }, [uidMemo])
+
+
 
   // Google 授權處理
   const handleGoogleAuth = async () => {
@@ -107,6 +123,121 @@ export default function RegistrationPage() {
         <div className="text-center space-y-4">
           <Loader2 className="w-8 h-8 animate-spin mx-auto text-blue-500" />
           <p className="text-gray-600">正在初始化...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // 已註冊用戶歡迎頁面
+  if (registrationStatus === 'registered') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md space-y-8">
+          <div className="text-center space-y-4">
+            <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto">
+              <Heart className="w-8 h-8 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                🎉 歡迎回來！
+              </h1>
+              <p className="text-gray-600">
+                您已成功註冊，可以使用所有功能
+              </p>
+            </div>
+          </div>
+
+          <Card className="border-0 shadow-lg">
+            <CardContent className="p-6 space-y-4">
+              <div className="text-center space-y-2">
+                <p className="font-semibold text-gray-900">用戶資訊</p>
+                {userProfile && (
+                  <div className="space-y-1 text-sm text-gray-600">
+                    <p><span className="font-medium">姓名：</span>{userProfile.name || '未設定'}</p>
+                    <p><span className="font-medium">身分：</span>{userProfile.role === 'teacher' ? '🎓 教師' : '📚 學生'}</p>
+                    <p><span className="font-medium">Google 帳號：</span>{userProfile.google_email || '未綁定'}</p>
+                  </div>
+                )}
+              </div>
+              
+              <div className="border-t pt-4">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-green-600">✅</span>
+                    <span className="text-sm text-green-800 font-medium">帳號已啟用</span>
+                  </div>
+                  <p className="text-xs text-green-700 mt-1">
+                    所有功能已可正常使用！
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Button 
+              onClick={() => router.push('/dashboard')}
+              className="flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700"
+            >
+              <BookOpen className="w-4 h-4" />
+              <span>課程管理</span>
+            </Button>
+            <Button 
+              onClick={() => router.push('/line')}
+              variant="outline"
+              className="flex items-center justify-center space-x-2"
+            >
+              <Users className="w-4 h-4" />
+              <span>LINE 功能</span>
+            </Button>
+          </div>
+
+          <div className="text-center space-y-2">
+            <p className="text-sm text-gray-500">
+              您可以透過 LINE Bot 或網頁使用所有功能
+            </p>
+            <p className="text-xs text-gray-400">
+              📱 查看 LINE 訊息獲取功能選單
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // 檢查狀態載入中
+  if (registrationStatus === 'checking') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto text-blue-500" />
+          <p className="text-gray-600">正在檢查註冊狀態...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // 檢查狀態錯誤
+  if (registrationStatus === 'error') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <Card className="border-red-200 bg-red-50">
+            <CardContent className="p-6 text-center">
+              <div className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-white text-xl">!</span>
+              </div>
+              <h2 className="text-lg font-semibold text-red-800 mb-2">檢查狀態失敗</h2>
+              <p className="text-red-600 text-sm">無法確認註冊狀態，請重新整理頁面</p>
+              <Button 
+                onClick={() => window.location.reload()}
+                className="mt-4"
+                variant="outline"
+              >
+                重新整理
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     )
@@ -282,45 +413,51 @@ export default function RegistrationPage() {
     )
   }
 
-  // 根據當前步驟渲染對應頁面
-  switch (currentStep) {
-    case 1:
-      return (
-        <RegistrationRoleSelection
-          selectedRole={data.role}
-          onRoleSelect={(role) => updateData({ role })}
-          onNext={nextStep}
-          canProceed={canProceedToNext()}
-        />
-      )
+  // 只有在確認未註冊時才顯示註冊流程
+  if (registrationStatus === 'not_registered') {
+    // 根據當前步驟渲染對應頁面
+    switch (currentStep) {
+      case 1:
+        return (
+          <RegistrationRoleSelection
+            selectedRole={data.role}
+            onRoleSelect={(role) => updateData({ role })}
+            onNext={nextStep}
+            canProceed={canProceedToNext()}
+          />
+        )
 
-    case 2:
-      return (
-        <RegistrationNameInput
-          name={data.name}
-          role={data.role}
-          onNameChange={(name) => updateData({ name })}
-          onNext={nextStep}
-          onPrev={prevStep}
-          canProceed={canProceedToNext()}
-        />
-      )
+      case 2:
+        return (
+          <RegistrationNameInput
+            name={data.name}
+            role={data.role}
+            onNameChange={(name) => updateData({ name })}
+            onNext={nextStep}
+            onPrev={prevStep}
+            canProceed={canProceedToNext()}
+          />
+        )
 
-    case 3:
-      return (
-        <RegistrationGoogleAuth
-          name={data.name}
-          role={data.role}
-          googleEmail={data.googleEmail}
-          lineUserId={data.lineUserId}
-          isLoading={isLoading}
-          isGoogleLoading={googleLoading}
-          onGoogleAuth={handleGoogleAuth}
-          onPrev={prevStep}
-        />
-      )
+      case 3:
+        return (
+          <RegistrationGoogleAuth
+            name={data.name}
+            role={data.role}
+            googleEmail={data.googleEmail}
+            lineUserId={data.lineUserId}
+            isLoading={isLoading}
+            isGoogleLoading={googleLoading}
+            onGoogleAuth={handleGoogleAuth}
+            onPrev={prevStep}
+          />
+        )
 
-    default:
-      return null
+      default:
+        return null
+    }
   }
+
+  // 預設返回 null（不應該到達這裡）
+  return null
 }
