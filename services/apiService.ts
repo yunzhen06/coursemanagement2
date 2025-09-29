@@ -158,6 +158,18 @@ export class ApiService {
         const errText = await response.text().catch(() => '')
         let errJson: any = {}
         try { errJson = errText ? JSON.parse(errText) : {} } catch { errJson = {} }
+        // 強化錯誤輸出，便於定位 400 的真正原因
+        try {
+          console.error('[API] Request failed', {
+            url: fullUrl,
+            method: options.method || 'GET',
+            status: response.status,
+            statusText: response.statusText,
+            contentType: response.headers.get('content-type') || '',
+            bodyPreview: errText ? errText.slice(0, 500) : '',
+            json: errJson,
+          })
+        } catch {}
         return {
           error: errJson.message || `HTTP ${response.status}`,
           details: errJson || errText
