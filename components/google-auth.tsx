@@ -24,6 +24,16 @@ export function GoogleAuth({ onAuthSuccess, onAuthError }: GoogleAuthProps) {
     try {
       // 從後端獲取 Google OAuth URL
       const { redirectUrl } = await ApiService.getGoogleOAuthUrl()
+
+      // 若未取得有效連結，顯示錯誤並中止
+      if (!redirectUrl) {
+        const msg = '無法取得授權連結，請稍後再試或聯繫管理員'
+        console.error(msg)
+        setError(msg)
+        onAuthError?.(msg)
+        setIsLoading(false)
+        return
+      }
       
       // 在新視窗中打開 Google 授權頁面
       const authWindow = window.open(
@@ -32,6 +42,10 @@ export function GoogleAuth({ onAuthSuccess, onAuthError }: GoogleAuthProps) {
         'width=500,height=600,scrollbars=yes,resizable=yes'
       )
 
+      if (!authWindow) {
+        throw new Error('無法打開授權視窗，請檢查瀏覽器彈出視窗設定')
+      }
+      
       // 監聽來自授權頁面的 postMessage
       const handleMessage = (event: MessageEvent) => {
         if (event.origin !== window.location.origin) {

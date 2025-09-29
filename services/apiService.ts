@@ -740,10 +740,25 @@ export class ApiService {
       this.bootstrapLineUserId()
     }
     
-    return this.request<{ auth_url: string }>('/google/url/', {
-      method: 'POST',
-      body: JSON.stringify({ line_user_id: this.lineUserId }),
-    }, 'oauth')
+    const res = await this.request<any>(
+      '/google/url/',
+      {
+        method: 'POST',
+        body: JSON.stringify({ line_user_id: this.lineUserId }),
+      },
+      'oauth'
+    )
+
+    if (res.error) {
+      console.error('取得 Google OAuth URL 失敗:', res.error)
+      return { redirectUrl: '' }
+    }
+    const data = res.data as any
+    const url = data?.redirectUrl || data?.auth_url || data?.authUrl || data?.url || ''
+    if (!url) {
+      console.warn('後端未提供有效的授權連結:', data)
+    }
+    return { redirectUrl: url }
   }
 
   // Google Calendar 相關 API

@@ -50,6 +50,14 @@ export function useGoogleAuth() {
       // 從後端獲取 Google OAuth URL
       const { redirectUrl } = await ApiService.getGoogleOAuthUrl()
 
+      if (!redirectUrl) {
+        const msg = '無法取得授權連結，請稍後再試或聯繫管理員'
+        console.error(msg)
+        setError(msg)
+        setLoading(false)
+        throw new Error(msg)
+      }
+
       // 使用新標籤頁而不是彈出窗口來避免 disallowed_useragent 錯誤
       const authWindow = window.open(
         redirectUrl,

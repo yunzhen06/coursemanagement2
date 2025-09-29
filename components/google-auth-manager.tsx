@@ -106,6 +106,15 @@ export function GoogleAuthManager({
       // 從後端獲取 Google OAuth URL
       const { redirectUrl } = await ApiService.getGoogleOAuthUrl()
       
+      if (!redirectUrl) {
+        const msg = '無法取得授權連結，請稍後再試或聯繫管理員'
+        console.error(msg)
+        setError(msg)
+        onAuthError?.(msg)
+        setIsLoading(false)
+        return
+      }
+      
       // 在新視窗中打開 Google 授權頁面
       const authWindow = window.open(
         redirectUrl,
