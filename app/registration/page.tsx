@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useRegistrationFlow } from '@/hooks/use-registration-flow'
 import { ApiService } from '@/services/apiService'
@@ -39,11 +39,17 @@ export default function RegistrationPage() {
   // 不再自動重定向，讓註冊頁面處理 LINE 登入流程
 
   // 已註冊使用者導向守衛：若已綁定則離開註冊頁
+  const uidMemo = useMemo(() => {
+    const uid = lineUser?.userId || ApiService.getLineUserId() || ApiService.bootstrapLineUserId()
+    return uid || ''
+  }, [lineUser?.userId])
+
+  const didCheckRef = useRef(false)
+
   useEffect(() => {
     const checkRegistered = async () => {
       try {
-        // 在非 LIFF 或本地環境下，回退使用已儲存的 lineUserId
-        const uid = lineUser?.userId || ApiService.getLineUserId() || ApiService.bootstrapLineUserId()
+        const uid = uidMemo
         if (!uid) return
         // 確保後續 API 請求帶入正確的 LINE 使用者 ID
         try { ApiService.setLineUserId(uid) } catch {}
@@ -55,9 +61,13 @@ export default function RegistrationPage() {
         // 忽略錯誤，保持在註冊頁
       }
     }
-    checkRegistered()
-    // 僅在 LINE 使用者 ID 改變時檢查
-  }, [lineUser?.userId])
+    // 僅在 LINE 使用者 ID 改變時檢查；避免嚴格模式造成的重複執行
+    didCheckRef.current = false
+    if (!didCheckRef.current) {
+      didCheckRef.current = true
+      checkRegistered()
+    }
+  }, [uidMemo])
 
   // Google 授權處理
   const handleGoogleAuth = async () => {

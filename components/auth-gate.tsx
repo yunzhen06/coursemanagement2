@@ -13,10 +13,11 @@ interface AuthGateProps {
 export function AuthGate({ children }: AuthGateProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const { isAuthenticated, isLoading: authLoading, needsRegistration, lineProfile } = useUserAuth()
-  const { isLoading: lineLoading, isLoggedIn } = useLineAuth()
-
   const isRegistrationPage = pathname === '/registration'
+  const { isAuthenticated, isLoading: authLoading, needsRegistration, lineProfile } = useUserAuth({
+    skipAutoCheck: isRegistrationPage
+  })
+  const { isLoading: lineLoading, isLoggedIn } = useLineAuth()
 
   useEffect(() => {
     if (isRegistrationPage) return

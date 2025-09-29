@@ -12,7 +12,11 @@ export interface UserAuthState {
   needsRegistration: boolean
 }
 
-export function useUserAuth() {
+export interface UserAuthOptions {
+  skipAutoCheck?: boolean
+}
+
+export function useUserAuth(options?: UserAuthOptions) {
   const { isLoggedIn, user: userProfile, isLoading: lineLoading } = useLineAuth()
   const [authState, setAuthState] = useState<UserAuthState>({
     isAuthenticated: false,
@@ -97,8 +101,14 @@ export function useUserAuth() {
       return
     }
 
+    // 在註冊頁面避免重複觸發註冊狀態檢查，交由註冊頁自行處理
+    if (options?.skipAutoCheck) {
+      setAuthState(prev => ({ ...prev, isLoading: false }))
+      return
+    }
+
     checkUserRegistration(userProfile.userId)
-  }, [isLoggedIn, userProfile?.userId, lineLoading])
+  }, [isLoggedIn, userProfile?.userId, lineLoading, options?.skipAutoCheck])
 
   return {
     ...authState,
