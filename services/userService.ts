@@ -20,10 +20,18 @@ export interface UserProfile {
 }
 
 export class UserService {
-  // 在瀏覽器端使用相對路徑，交由 Next.js rewrites 代理；在伺服器端使用環境變數
+  // 基底 URL（僅用於非 v2 路徑時會進一步映射）
   private static baseUrl = (typeof window !== 'undefined')
     ? (process.env.NEXT_PUBLIC_API_BASE_URL || '')
     : (process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
+
+  private static getOnboardBase(): string {
+    const raw = (this.baseUrl || '').replace(/\/+$/,'')
+    const lower = raw.toLowerCase()
+    if (/\/api\/v2$/.test(lower)) return raw.replace(/\/api\/v2$/, '/api')
+    if (/\/api$/.test(lower)) return raw
+    return `${raw}/api`
+  }
 
   /**
    * 註冊新用戶並綁定 LINE User ID 與 Google Email
@@ -228,7 +236,7 @@ export class UserService {
    */
   static async getOnboardStatus(lineUserId: string): Promise<boolean> {
     try {
-      const response = await fetch(`${this.baseUrl ? this.baseUrl.replace(/\/+$/,'') : ''}/onboard/status/${lineUserId}/`)
+      const response = await fetch(`${this.getOnboardBase()}/onboard/status/${lineUserId}/`)
       if (!response.ok) {
         console.error('查詢註冊狀態失敗:', response.status, response.statusText)
         return false

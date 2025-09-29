@@ -98,9 +98,20 @@ export class ApiService {
         // 瀏覽器端，優先使用公開環境變數作為後端 API 基底
         const publicApiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/+$/,'')
         if (publicApiBase) {
-          if (apiPrefix === 'oauth') baseUrl = `${publicApiBase}/oauth`
-          else if (apiPrefix === 'onboard') baseUrl = `${publicApiBase}`
-          else baseUrl = `${publicApiBase}/v2`
+          const lower = publicApiBase.toLowerCase()
+          const endsV2 = /\/api\/v2$/.test(lower)
+          const endsApi = /\/api$/.test(lower)
+          const endsNone = !/\/api(\/v2)?$/.test(lower)
+
+          if (apiPrefix === 'v2') {
+            baseUrl = endsV2 ? publicApiBase : endsApi ? `${publicApiBase}/v2` : `${publicApiBase}/api/v2`
+          } else if (apiPrefix === 'onboard') {
+            baseUrl = endsV2 ? publicApiBase.replace(/\/api\/v2$/, '/api') : endsApi ? publicApiBase : `${publicApiBase}/api`
+          } else if (apiPrefix === 'oauth') {
+            baseUrl = endsV2 ? publicApiBase.replace(/\/api\/v2$/, '/api/oauth') : endsApi ? `${publicApiBase}/oauth` : `${publicApiBase}/api/oauth`
+          } else {
+            baseUrl = publicApiBase
+          }
         } else {
           // 後援：未設定環境變數時走 Next.js 代理
           if (apiPrefix === 'oauth') baseUrl = '/api/oauth'
