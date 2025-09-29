@@ -101,17 +101,8 @@ export class ApiService {
       // 根據前綴決定基礎 URL
       let baseUrl: string
       if (typeof window !== 'undefined') {
-        // 瀏覽器端
-        if (process.env.NODE_ENV === 'development') {
-          // 本地開發環境，使用相對路徑（有代理）
-          baseUrl = apiPrefix === 'oauth' ? '/api/oauth' : '/api/v2'
-        } else {
-          // 生產環境（Vercel），直接使用完整的後端 URL
-          const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api/v2', '') || 'http://localhost:3000'
-          baseUrl = apiPrefix === 'oauth' 
-            ? `${backendUrl}/api/oauth` 
-            : `${backendUrl}/api/v2`
-        }
+        // 瀏覽器端，使用相對路徑代理
+        baseUrl = apiPrefix === 'oauth' ? '/api/oauth' : '/api/v2'
       } else {
         // 伺服器端，使用環境變數
         const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:8000'

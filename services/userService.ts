@@ -20,7 +20,7 @@ export interface UserProfile {
 }
 
 export class UserService {
-  private static baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api/v2', '') || 'http://localhost:8000'
+  private static baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
   /**
    * 註冊新用戶並綁定 LINE User ID 與 Google Email
