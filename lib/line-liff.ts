@@ -1,7 +1,4 @@
 import liff from '@line/liff'
-import getConfig from 'next/config'
-
-const { publicRuntimeConfig } = getConfig()
 
 // 檢查是否為開發環境
 const isDevelopment = process.env.NODE_ENV === 'development' || 
@@ -9,7 +6,7 @@ const isDevelopment = process.env.NODE_ENV === 'development' ||
 
 // LINE LIFF 配置
 export const LIFF_CONFIG = {
-  liffId: publicRuntimeConfig.liffId || '', // 從 publicRuntimeConfig 取得 LIFF ID
+  liffId: process.env.NEXT_PUBLIC_LIFF_ID || '', // 從環境變數取得 LIFF ID
   redirectUri: process.env.NEXT_PUBLIC_REDIRECT_URI || 'https://your-domain.com',
   // 開發環境配置
   isDevelopment,
