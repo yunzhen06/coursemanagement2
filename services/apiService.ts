@@ -740,10 +740,15 @@ export class ApiService {
       this.bootstrapLineUserId()
     }
     
+    // 确保 X-Line-User-Id 头部被正确设置
     const res = await this.request<any>(
       '/google/url/',
       {
         method: 'POST',
+        headers: {
+          'X-Line-User-Id': this.lineUserId,
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({ line_user_id: this.lineUserId }),
       },
       'oauth'
