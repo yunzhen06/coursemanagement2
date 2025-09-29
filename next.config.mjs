@@ -6,6 +6,9 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  publicRuntimeConfig: {
+    liffId: process.env.NEXT_PUBLIC_LIFF_ID,
+  },
   images: {
     unoptimized: true,
   },

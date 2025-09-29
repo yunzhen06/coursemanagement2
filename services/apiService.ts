@@ -91,10 +91,26 @@ export class ApiService {
 
   private static async request<T>(
     endpoint: string, 
-    options: RequestInit = {}
+    options: RequestInit = {},
+    // 新增：API 路徑前綴，預設為 /api/v2
+    apiPrefix: 'v2' | 'oauth' | 'other' = 'v2'
   ): Promise<ApiResponse<T>> {
     try {
       const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData
+      
+      // 根據前綴決定基礎 URL
+      let baseUrl: string
+      if (typeof window !== 'undefined') {
+        // 瀏覽器端，使用相對路徑代理
+        baseUrl = apiPrefix === 'oauth' ? '/api/oauth' : '/api/v2'
+      } else {
+        // 伺服器端，使用環境變數
+        const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:8000'
+        baseUrl = apiPrefix === 'oauth' 
+          ? `${backendUrl}/api/oauth` 
+          : `${backendUrl}/api/v2`
+      }
+
       const baseHeaders: Record<string, any> = {
         'X-Line-User-Id': this.lineUserId,
         ...(options.headers || {}),
@@ -103,12 +119,12 @@ export class ApiService {
         baseHeaders['Content-Type'] = 'application/json'
       }
 
-      // 如果 API_BASE_URL 包含 ngrok-free.app，添加 ngrok-skip-browser-warning header
-      if (API_BASE_URL.includes('ngrok-free.app')) {
+      // 如果 baseUrl 包含 ngrok-free.app，添加 ngrok-skip-browser-warning header
+      if (baseUrl.includes('ngrok-free.app')) {
         baseHeaders['ngrok-skip-browser-warning'] = 'true'
       }
 
-      const fullUrl = `${API_BASE_URL}${endpoint}`
+      const fullUrl = `${baseUrl}${endpoint}`
       console.log(`[API] Making request to: ${fullUrl}`)
       
       const response = await fetch(fullUrl, {
@@ -724,47 +740,10 @@ export class ApiService {
       this.bootstrapLineUserId()
     }
     
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'X-Line-User-Id': this.lineUserId,
-    }
-    
-    // 添加 CSRF token（如果可用）
-    const csrfHeaders = createCsrfHeaders()
-    Object.assign(headers, csrfHeaders)
-    
-    // 建構正確的 OAuth URL
-    const backendUrl = getBackendBaseUrl()
-    const oauthUrl = typeof window !== 'undefined' 
-      ? '/api/oauth/google/url/'  // 瀏覽器環境：使用代理
-      : `${backendUrl}/api/oauth/google/url/`  // 伺服器環境：直接連接到後端
-    
-    // 如果 API_BASE_URL 包含 ngrok-free.app，添加 ngrok-skip-browser-warning header
-    if (API_BASE_URL.includes('ngrok-free.app')) {
-      headers['ngrok-skip-browser-warning'] = 'true'
-    }
-    
-    const response = await fetch(oauthUrl, {
+    return this.request<{ auth_url: string }>('/google/url/', {
       method: 'POST',
-      headers,
       body: JSON.stringify({ line_user_id: this.lineUserId }),
-    })
-    
-    if (!response.ok) {
-      const errorText = await response.text()
-      let errorMessage = 'Failed to get Google OAuth URL'
-      
-      try {
-        const errorData = JSON.parse(errorText)
-        errorMessage = errorData.error || errorMessage
-      } catch {
-        errorMessage = errorText || errorMessage
-      }
-      
-      throw new Error(errorMessage)
-    }
-    
-    return response.json()
+    }, 'oauth')
   }
 
   // Google Calendar 相關 API
