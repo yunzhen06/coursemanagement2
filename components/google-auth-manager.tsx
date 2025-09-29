@@ -132,6 +132,16 @@ export function GoogleAuthManager({
         if (event.data.type === 'google-auth-success') {
           window.removeEventListener('message', handleMessage)
           authWindow.close()
+          // 儲存 line_user_id 以利後續 API 調用
+          try {
+            const incomingId = (event.data as any)?.line_user_id
+            if (typeof incomingId === 'string' && incomingId.trim()) {
+              ApiService.setLineUserId(incomingId)
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('lineUserId', incomingId)
+              }
+            }
+          } catch {}
           checkAuthStatus()
           onAuthSuccess?.()
         } else if (event.data.type === 'google-auth-error') {

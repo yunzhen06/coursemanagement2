@@ -49,6 +49,16 @@ export function GoogleAuth({ onAuthSuccess, onAuthError }: GoogleAuthProps) {
         if (event.data.type === 'GOOGLE_AUTH_SUCCESS') {
           window.removeEventListener('message', handleMessage)
           authWindow?.close()
+          // 儲存 line_user_id，以支援非 LIFF 環境
+          try {
+            const incomingId = (event.data as any)?.line_user_id
+            if (typeof incomingId === 'string' && incomingId.trim()) {
+              ApiService.setLineUserId(incomingId)
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('lineUserId', incomingId)
+              }
+            }
+          } catch {}
           setIsAuthorized(true)
           setIsLoading(false)
           onAuthSuccess?.()

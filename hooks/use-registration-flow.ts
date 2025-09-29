@@ -108,18 +108,19 @@ export function useRegistrationFlow() {
 
     try {
       // 驗證必要資料
-      if (!state.data.role || !state.data.name || !state.data.lineUserId) {
+      const effectiveLineUserId = state.data.lineUserId || ApiService.getLineUserId() || ApiService.bootstrapLineUserId()
+      if (!state.data.role || !state.data.name || !effectiveLineUserId) {
         throw new Error('註冊資料不完整')
       }
 
       // 防重複：只要已完成 Google 綁定（有 refresh token），就視為已註冊
-      const alreadyRegistered = await UserService.getOnboardStatus(state.data.lineUserId)
+      const alreadyRegistered = await UserService.getOnboardStatus(effectiveLineUserId)
       if (alreadyRegistered) {
         throw new Error('此 LINE 帳號已經註冊過了')
       }
 
       // 只更新 Profile 的 name 與 role，Google 授權後端在 callback 中寫入
-      await ApiService.updateProfile(state.data.lineUserId, {
+      await ApiService.updateProfile(effectiveLineUserId, {
         name: state.data.name,
         role: state.data.role
       })
@@ -127,7 +128,7 @@ export function useRegistrationFlow() {
       // 發送註冊完成 Flex Message 到 LINE Bot（可選）
       try {
         await UserService.sendRegistrationCompleteMessage(
-          state.data.lineUserId,
+          effectiveLineUserId,
           state.data.name,
           state.data.role!
         )
@@ -137,6 +138,10 @@ export function useRegistrationFlow() {
 
       setState(prev => ({
         ...prev,
+        data: {
+          ...prev.data,
+          lineUserId: effectiveLineUserId
+        },
         isCompleted: true
       }))
 
@@ -157,17 +162,18 @@ export function useRegistrationFlow() {
 
     try {
       // 驗證必要資料
-      if (!state.data.role || !state.data.name || !state.data.lineUserId) {
+      const effectiveLineUserId = state.data.lineUserId || ApiService.getLineUserId() || ApiService.bootstrapLineUserId()
+      if (!state.data.role || !state.data.name || !effectiveLineUserId) {
         throw new Error('註冊資料不完整')
       }
 
-      const alreadyRegistered = await UserService.getOnboardStatus(state.data.lineUserId)
+      const alreadyRegistered = await UserService.getOnboardStatus(effectiveLineUserId)
       if (alreadyRegistered) {
         throw new Error('此 LINE 帳號已經註冊過了')
       }
 
       // 更新基本資料 + 暫存 email（非必要，後端 callback 也會寫入）
-      await ApiService.updateProfile(state.data.lineUserId, {
+      await ApiService.updateProfile(effectiveLineUserId, {
         name: state.data.name,
         role: state.data.role,
         email: googleEmail
@@ -176,7 +182,7 @@ export function useRegistrationFlow() {
       // 仍保留發送註冊完成 Flex Message
       try {
         await UserService.sendRegistrationCompleteMessage(
-          state.data.lineUserId,
+          effectiveLineUserId,
           state.data.name,
           state.data.role!
         )
@@ -188,7 +194,8 @@ export function useRegistrationFlow() {
         ...prev,
         data: {
           ...prev.data,
-          googleEmail
+          googleEmail,
+          lineUserId: effectiveLineUserId
         },
         isCompleted: true
       }))

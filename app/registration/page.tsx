@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useRegistrationFlow } from '@/hooks/use-registration-flow'
+import { ApiService } from '@/services/apiService'
 import { UserService } from '@/services/userService'
 import { useLineAuth } from '@/hooks/use-line-auth'
 import { useGoogleAuth } from '@/hooks/use-google-auth'
@@ -41,8 +42,11 @@ export default function RegistrationPage() {
   useEffect(() => {
     const checkRegistered = async () => {
       try {
-        const uid = lineUser?.userId
+        // 在非 LIFF 或本地環境下，回退使用已儲存的 lineUserId
+        const uid = lineUser?.userId || ApiService.getLineUserId() || ApiService.bootstrapLineUserId()
         if (!uid) return
+        // 確保後續 API 請求帶入正確的 LINE 使用者 ID
+        try { ApiService.setLineUserId(uid) } catch {}
         const registered = await UserService.getOnboardStatus(uid)
         if (registered) {
           router.replace('/line')
@@ -64,7 +68,9 @@ export default function RegistrationPage() {
         name: data.name || ''
       })
       if (userEmail) {
-        updateData({ googleEmail: userEmail })
+        // 同步保存 lineUserId（來自授權成功訊息或先前儲存）
+        const effectiveId = ApiService.getLineUserId() || ApiService.bootstrapLineUserId()
+        updateData({ googleEmail: userEmail, lineUserId: effectiveId })
         // Google 授權成功後自動完成註冊
         const success = await completeRegistrationWithEmail(userEmail)
         if (success) {

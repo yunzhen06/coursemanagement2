@@ -98,6 +98,16 @@ export function useGoogleAuth() {
           if (event.data.type === 'GOOGLE_AUTH_SUCCESS') {
             window.removeEventListener('message', handleMessage)
             authWindow?.close()
+            // 儲存從成功頁回傳的 line_user_id，避免非 LIFF 環境下缺少 ID
+            try {
+              const incomingId = (event.data as any)?.line_user_id
+              if (typeof incomingId === 'string' && incomingId.trim()) {
+                ApiService.setLineUserId(incomingId)
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('lineUserId', incomingId)
+                }
+              }
+            } catch {}
             const userEmail = event.data.email || 'user@gmail.com'
             setAuthorized(true, userEmail)
             setLoading(false)
