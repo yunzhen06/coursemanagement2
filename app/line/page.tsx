@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Calendar, BookOpen, FileText, CheckSquare, Share2, Bell, Users, Settings, UserPlus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 export default function LinePage() {
   const { 
@@ -184,6 +185,13 @@ export default function LinePage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
+              {/* 新增：前往 LIFF 應用頁面 */}
+              <Button 
+                className="w-full justify-start"
+                onClick={() => router.push('/liff-app')}
+              >
+                前往 LIFF 應用
+              </Button>
               <Button 
                 variant="outline" 
                 className="w-full justify-start"

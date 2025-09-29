@@ -11,6 +11,9 @@ import {
   validateLiffConfig
 } from '@/lib/line-liff'
 
+// 不再於本地自動跳過；僅由環境變數控制是否跳過（預設不跳過）
+const shouldSkipLiffLocal = process.env.NEXT_PUBLIC_SKIP_LIFF_LOCAL === 'true'
+
 interface LineUser {
   userId: string
   displayName: string
@@ -56,6 +59,19 @@ export const useLineAuth = () => {
 
           // 未登入時自動觸發 LINE 登入（需要正確的 redirectUri 配置）
           if (!loggedIn) {
+            // 僅當顯式設定跳過時不導向
+            if (shouldSkipLiffLocal) {
+              console.log('🏁 已設定跳過 LIFF 登入導向')
+              setState({
+                isInitialized: true,
+                isInLineApp: false,
+                isLoggedIn: false,
+                user: null,
+                isLoading: false,
+                error: null
+              })
+              return
+            }
             const configCheck = validateLiffConfig()
             if (configCheck.isValid) {
               console.log('👉 未登入，自動觸發 LINE 授權導向')

@@ -4,6 +4,9 @@ import liff from '@line/liff'
 const isDevelopment = process.env.NODE_ENV === 'development' || 
                      process.env.NEXT_PUBLIC_IS_DEVELOPMENT === 'true'
 
+// 是否跳過 LIFF：僅由環境變數控制，預設不跳過（全面開啟真實流程）
+const shouldSkipLiff = process.env.NEXT_PUBLIC_SKIP_LIFF_LOCAL === 'true'
+
 // LINE LIFF 配置
 export const LIFF_CONFIG = {
   liffId: process.env.NEXT_PUBLIC_LIFF_ID || '', // 從環境變數取得 LIFF ID
@@ -17,6 +20,12 @@ export const LIFF_CONFIG = {
 // LIFF 初始化
 export const initializeLiff = async (): Promise<boolean> => {
   try {
+    // 僅在顯式設定跳過時才略過初始化
+    if (shouldSkipLiff) {
+      console.log('⚠️ 已設定 NEXT_PUBLIC_SKIP_LIFF_LOCAL=true，跳過 LIFF 初始化與登入流程')
+      return true
+    }
+
     if (!LIFF_CONFIG.liffId) {
       console.error('LIFF ID 未設定')
       return false
@@ -65,6 +74,7 @@ export const initializeLiff = async (): Promise<boolean> => {
 // 檢查是否在 LINE 內瀏覽器
 export const isInLineApp = (): boolean => {
   try {
+    if (shouldSkipLiff) return false
     return liff.isInClient()
   } catch (error) {
     console.error('檢查 LINE 應用狀態失敗:', error)
@@ -75,6 +85,7 @@ export const isInLineApp = (): boolean => {
 // 檢查用戶是否已登入
 export const isLoggedIn = (): boolean => {
   try {
+    if (shouldSkipLiff) return false
     return liff.isLoggedIn()
   } catch (error) {
     console.error('檢查 LINE 登入狀態失敗:', error)
@@ -84,6 +95,10 @@ export const isLoggedIn = (): boolean => {
 
 // LINE 登入
 export const lineLogin = (): void => {
+  if (shouldSkipLiff) {
+    console.log('環境已設定跳過 LIFF 登入')
+    return
+  }
   if (!liff.isLoggedIn()) {
     liff.login({
       redirectUri: LIFF_CONFIG.redirectUri
@@ -93,6 +108,10 @@ export const lineLogin = (): void => {
 
 // LINE 登出
 export const lineLogout = (): void => {
+  if (shouldSkipLiff) {
+    console.log('環境已設定跳過 LIFF 登出')
+    return
+  }
   if (liff.isLoggedIn()) {
     liff.logout()
   }
@@ -101,6 +120,7 @@ export const lineLogout = (): void => {
 // 取得用戶資料
 export const getUserProfile = async () => {
   try {
+    if (shouldSkipLiff) return null
     if (liff.isLoggedIn()) {
       const profile = await liff.getProfile()
       return {
@@ -120,6 +140,7 @@ export const getUserProfile = async () => {
 // 取得存取權杖
 export const getAccessToken = (): string | null => {
   try {
+    if (shouldSkipLiff) return null
     if (liff.isLoggedIn()) {
       return liff.getAccessToken()
     }
@@ -132,6 +153,7 @@ export const getAccessToken = (): string | null => {
 
 // 關閉 LIFF 視窗
 export const closeLiffWindow = (): void => {
+  if (shouldSkipLiff) return
   if (liff.isInClient()) {
     liff.closeWindow()
   }
@@ -164,13 +186,13 @@ export const shareToLine = (url: string, text: string): void => {
 // 取得 LINE 環境資訊
 export const getLineEnvironment = () => {
   return {
-    isInClient: liff.isInClient(),
-    isLoggedIn: liff.isLoggedIn(),
-    os: liff.getOS(),
-    language: liff.getLanguage(),
-    version: liff.getVersion(),
-    lineVersion: liff.getLineVersion(),
-    isApiAvailable: (api: string) => liff.isApiAvailable(api)
+    isInClient: shouldSkipLiff ? false : liff.isInClient(),
+    isLoggedIn: shouldSkipLiff ? false : liff.isLoggedIn(),
+    os: shouldSkipLiff ? 'web' : liff.getOS(),
+    language: shouldSkipLiff ? (typeof navigator !== 'undefined' ? navigator.language : 'zh-TW') : liff.getLanguage(),
+    version: shouldSkipLiff ? 'skip' : liff.getVersion(),
+    lineVersion: shouldSkipLiff ? 'skip' : liff.getLineVersion(),
+    isApiAvailable: (api: string) => shouldSkipLiff ? false : liff.isApiAvailable(api)
   }
 }
 
@@ -184,7 +206,8 @@ export const getDevelopmentInfo = () => {
     configuredEndpoint: LIFF_CONFIG.redirectUri,
     devUrl: LIFF_CONFIG.devUrl,
     ngrokUrl: LIFF_CONFIG.ngrokUrl,
-    message: '開發環境中 LIFF URL 不匹配是正常現象，不會影響功能'
+    skipLiff: shouldSkipLiff,
+    message: '請確認 redirectUri 與 LIFF 端點一致，或使用 ngrok' 
   }
 }
 

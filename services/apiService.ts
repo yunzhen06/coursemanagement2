@@ -1,4 +1,4 @@
-import { createCsrfHeaders } from '@/lib/csrf-token'
+import { createCsrfHeaders, fetchCsrfToken } from '@/lib/csrf-token'
 
 // 根據環境設定 API 基礎 URL
 function getApiBaseUrl(): string {
@@ -68,24 +68,18 @@ export class ApiService {
     return this.lineUserId
   }
 
-  // 訪客模式：在瀏覽器產生並保存 guest lineUserId
+  // 不再產生訪客 ID；僅從現有狀態或儲存中取得（若不存在則回傳空字串）
   static bootstrapLineUserId(): string {
     if (typeof window === 'undefined') return this.lineUserId || ''
     try {
       const KEY = 'lineUserId'
-      let id = localStorage.getItem(KEY) || ''
-      if (!id) {
-        // 動態生成訪客 ID
-        id = `guest-${crypto.randomUUID()}`
-        localStorage.setItem(KEY, id)
+      const id = localStorage.getItem(KEY) || ''
+      if (id) {
+        this.setLineUserId(id)
       }
-      this.setLineUserId(id)
       return id
     } catch {
-      // 無法使用 localStorage 時，回退為臨時 ID（不持久化）
-      const temp = this.lineUserId || `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-      this.setLineUserId(temp)
-      return temp
+      return this.lineUserId || ''
     }
   }
 
@@ -129,7 +123,11 @@ export class ApiService {
       
       const response = await fetch(fullUrl, {
         ...options,
-        headers: baseHeaders,
+        headers: {
+          ...baseHeaders,
+          // 合併 CSRF 標頭（若存在）
+          ...createCsrfHeaders()
+        },
         // 避免瀏覽器層快取舊資料
         cache: 'no-store'
       })
@@ -191,6 +189,7 @@ export class ApiService {
 
   static async createCourse(data: any) {
     // 確保有可用的 lineUserId，並放入 body 以通過後端驗證
+    // 需要真實的 lineUserId，不再自動產生訪客 ID
     if (!this.lineUserId) {
       this.bootstrapLineUserId()
     }
@@ -704,7 +703,15 @@ export class ApiService {
     })
   }
 
-
+  static async testGoogleConnection() {
+    if (!this.lineUserId) {
+      this.bootstrapLineUserId()
+    }
+    return this.request('/sync/test-connection/', {
+      method: 'POST',
+      body: JSON.stringify({ line_user_id: this.lineUserId })
+    })
+  }
 
   static async triggerAutoSync() {
     if (!this.lineUserId) {
@@ -731,31 +738,15 @@ export class ApiService {
     if (!this.lineUserId) {
       this.bootstrapLineUserId()
     }
+    // 在瀏覽器端，先嘗試取得 CSRF token（避免 403）
+    if (typeof window !== 'undefined') {
+      try { await fetchCsrfToken('') } catch {}
+    }
     
-    // 确保 X-Line-User-Id 头部被正确设置
-    const res = await this.request<any>(
-      '/google/url/',
-      {
-        method: 'POST',
-        headers: {
-          'X-Line-User-Id': this.lineUserId,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ line_user_id: this.lineUserId }),
-      },
-      'oauth'
-    )
-
-    if (res.error) {
-      console.error('取得 Google OAuth URL 失敗:', res.error)
-      return { redirectUrl: '' }
-    }
-    const data = res.data as any
-    const url = data?.redirectUrl || data?.auth_url || data?.authUrl || data?.url || ''
-    if (!url) {
-      console.warn('後端未提供有效的授權連結:', data)
-    }
-    return { redirectUrl: url }
+    return this.request<{ auth_url: string }>('/google/url/', {
+      method: 'POST',
+      body: JSON.stringify({ line_user_id: this.lineUserId }),
+    }, 'oauth')
   }
 
   // Google Calendar 相關 API

@@ -48,22 +48,18 @@ export function useGoogleAuth() {
       }
       
       // 從後端獲取 Google OAuth URL
-      const { redirectUrl } = await ApiService.getGoogleOAuthUrl()
-
-      if (!redirectUrl) {
-        const msg = '無法取得授權連結，請稍後再試或聯繫管理員'
-        console.error(msg)
-        setError(msg)
-        setLoading(false)
-        throw new Error(msg)
+      const resp = await ApiService.getGoogleOAuthUrl()
+      if (resp.error) {
+        throw new Error(resp.error)
+      }
+      const data: any = resp.data || {}
+      const redirectUrl = data.redirectUrl || data.auth_url || ''
+      if (!redirectUrl || typeof redirectUrl !== 'string') {
+        throw new Error('未取得授權連結')
       }
 
       // 使用新標籤頁而不是彈出窗口來避免 disallowed_useragent 錯誤
-      const authWindow = window.open(
-        redirectUrl,
-        '_blank',
-        'noopener,noreferrer'
-      )
+      const authWindow = window.open(redirectUrl, '_blank', 'noopener,noreferrer')
 
       if (!authWindow) {
         throw new Error('無法打開授權頁面，請允許瀏覽器開啟新標籤頁')
@@ -104,7 +100,7 @@ export function useGoogleAuth() {
               window.removeEventListener('message', handleMessage)
               setTimeout(async () => {
                 try {
-                  const response = await ApiService.getGoogleApiStatus()
+                  const response = await ApiService.testGoogleConnection()
                   if (response.data && (response.data as any).is_connected) {
                     const userEmail = 'user@gmail.com'
                     setAuthorized(true, userEmail)
@@ -146,7 +142,7 @@ export function useGoogleAuth() {
 
   const checkAuthStatus = useCallback(async () => {
     try {
-      const response = await ApiService.getGoogleApiStatus()
+      const response = await ApiService.testGoogleConnection()
       if (response.data && (response.data as any).is_connected) {
         setAuthorized(true, 'user@gmail.com') // 模擬 email
         return true

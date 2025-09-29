@@ -10,11 +10,14 @@ import { RegistrationNameInput } from '@/components/registration-name-input'
 import { RegistrationGoogleAuth } from '@/components/registration-google-auth'
 import { Card, CardContent } from '@/components/ui/card'
 import { CheckCircle, Loader2 } from 'lucide-react'
+import { closeLiffWindow } from '@/lib/line-liff'
 // import { Button } from '@/components/ui/button'
 
 export default function RegistrationPage() {
-  // const router = useRouter()
-  const { isLoggedIn, isLoading: lineLoading, login } = useLineAuth()
+  const router = useRouter()
+  const { isLoggedIn, isLoading: lineLoading, login, getDevInfo } = useLineAuth()
+  const devInfo = getDevInfo()
+  const skipLiff = !!devInfo?.skipLiff
   const { authorize: authorizeGoogle, isLoading: googleLoading } = useGoogleAuth()
   const {
     currentStep,
@@ -42,8 +45,7 @@ export default function RegistrationPage() {
         // Google 授權成功後自動完成註冊
         const success = await completeRegistrationWithEmail(userEmail)
         if (success) {
-          // 註冊成功後保留在完成頁，提示使用 LINE Bot
-          // 不自動跳轉到主頁面
+          router.replace('/line')
         }
       }
     } catch (error) {
@@ -76,6 +78,20 @@ export default function RegistrationPage() {
 
   // 註冊完成頁面
   if (isCompleted) {
+    // 顯示成功訊息後，數秒自動關閉（在 LINE 內）或導向 LINE 主頁
+    useEffect(() => {
+      const timer = setTimeout(() => {
+        if (typeof window !== 'undefined') {
+          // 若在 LINE 內，關閉 LIFF 視窗；否則導向到 /line
+          try {
+            closeLiffWindow()
+          } catch {}
+          router.replace('/line')
+        }
+      }, 3000)
+      return () => clearTimeout(timer)
+    }, [])
+
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center p-4">
         <div className="w-full max-w-md space-y-8">
@@ -88,7 +104,7 @@ export default function RegistrationPage() {
                 🎉 註冊完成！
               </h1>
               <p className="text-gray-600">
-                歡迎使用我們的智能課程管理系統
+                歡迎使用我們的智能課程管理系統（3 秒後自動關閉/導向）
               </p>
             </div>
           </div>
@@ -150,8 +166,9 @@ export default function RegistrationPage() {
     )
   }
 
-  // 如果 LINE 未登入，顯示說明（自動登入將已觸發）
-  if (!isLoggedIn && !lineLoading) {
+  // 如果 LINE 未登入，顯示說明（在本地可能已跳過授權）
+  // 本地略過 LIFF 時，不阻擋註冊流程，讓使用者可直接選擇身分
+  if (!isLoggedIn && !lineLoading && !skipLiff) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center p-4">
         <div className="w-full max-w-md">
@@ -159,7 +176,11 @@ export default function RegistrationPage() {
             <CardContent className="p-8 text-center space-y-6">
               <div className="space-y-2">
                 <h1 className="text-2xl font-bold text-gray-900">歡迎使用課程管理系統</h1>
-                <p className="text-gray-600">正在前往 LINE 授權頁面</p>
+                {skipLiff ? (
+                  <p className="text-gray-600">本地開發模式：已略過 LINE 授權</p>
+                ) : (
+                  <p className="text-gray-600">正在前往 LINE 授權頁面</p>
+                )}
               </div>
               
               <div className="space-y-4">
@@ -168,9 +189,15 @@ export default function RegistrationPage() {
                     <span className="text-blue-600">📱</span>
                     <span className="text-sm font-medium text-blue-800">LINE 登入授權</span>
                   </div>
-                  <p className="text-xs text-blue-700">
-                    系統會自動為您導向 LINE 登入授權。若未自動跳轉，請從 LINE 內再次開啟此頁，或重新整理。
-                  </p>
+                  {skipLiff ? (
+                    <p className="text-xs text-blue-700">
+                      您目前在本地環境，系統不會進行 LINE 授權。可直接進行註冊或以訪客模式測試功能。
+                    </p>
+                  ) : (
+                    <p className="text-xs text-blue-700">
+                      系統會自動為您導向 LINE 登入授權。若未自動跳轉，請從 LINE 內再次開啟此頁，或重新整理。
+                    </p>
+                  )}
                 </div>
                 
                 <div className="text-sm text-gray-500">
@@ -185,7 +212,11 @@ export default function RegistrationPage() {
 
               <div className="flex items-center justify-center space-x-2 text-gray-500">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="text-sm">等待導向至 LINE 授權...</span>
+                {skipLiff ? (
+                  <span className="text-sm">本地環境：未進行 LINE 授權</span>
+                ) : (
+                  <span className="text-sm">等待導向至 LINE 授權...</span>
+                )}
               </div>
             </CardContent>
           </Card>

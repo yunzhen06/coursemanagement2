@@ -31,7 +31,8 @@ export function useRegistrationFlow() {
       role: null,
       name: '',
       googleEmail: '',
-      lineUserId: ''
+      // 在未登入 LINE 時，預先使用訪客 ID 以便本地測試
+      lineUserId: ApiService.getLineUserId() || ApiService.bootstrapLineUserId()
     },
     isCompleted: false,
     isLoading: false,
@@ -207,7 +208,7 @@ export function useRegistrationFlow() {
         role: null,
         name: '',
         googleEmail: '',
-        lineUserId: lineUser?.userId || ''
+        lineUserId: lineUser?.userId || ApiService.getLineUserId() || ApiService.bootstrapLineUserId()
       },
       isCompleted: false,
       isLoading: false,

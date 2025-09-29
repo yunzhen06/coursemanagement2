@@ -124,18 +124,7 @@ export function ProfileContent({ user: propUser, onUserChange }: ProfileContentP
     }
   }
 
-  const handleLineLogin = () => {
-    // 模擬 LINE 登入流程
-    const newUser = {
-      ...user,
-      name: "張小明", // 這裡可以從 LINE API 獲取真實姓名
-      email: "已透過LINE登入",
-      isLoggedIn: true,
-    }
-    setUser(newUser)
-    onUserChange?.(newUser)
-    alert("已成功透過 LINE 登入！")
-  }
+  // 已移除模擬 LINE 登入流程，請改用真正的 LIFF 登入
 
   const handleLogout = () => {
     const newUser = {
@@ -541,11 +530,7 @@ export function ProfileContent({ user: propUser, onUserChange }: ProfileContentP
               <LogOutIcon className="w-4 h-4 mr-1" />
               登出
             </Button>
-          ) : (
-            <Button size="sm" onClick={handleLineLogin}>
-              line登入
-            </Button>
-          )}
+          ) : null}
         </div>
       </Card>
 

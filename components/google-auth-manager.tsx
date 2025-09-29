@@ -48,7 +48,7 @@ export function GoogleAuthManager({
 
       if (showClassroomSync) {
         try {
-          const classroomResponse = await ApiService.getGoogleApiStatus()
+          const classroomResponse = await ApiService.testGoogleConnection()
           classroomConnected = classroomResponse.data?.is_connected || false
         } catch (error) {
           console.error('Classroom 連接測試失敗:', error)
@@ -104,17 +104,16 @@ export function GoogleAuthManager({
 
     try {
       // 從後端獲取 Google OAuth URL
-      const { redirectUrl } = await ApiService.getGoogleOAuthUrl()
-      
-      if (!redirectUrl) {
-        const msg = '無法取得授權連結，請稍後再試或聯繫管理員'
-        console.error(msg)
-        setError(msg)
-        onAuthError?.(msg)
-        setIsLoading(false)
-        return
+      const resp = await ApiService.getGoogleOAuthUrl()
+      if (resp.error) {
+        throw new Error(resp.error)
       }
-      
+      const data: any = resp.data || {}
+      const redirectUrl = data.redirectUrl || data.auth_url || ''
+      if (!redirectUrl || typeof redirectUrl !== 'string') {
+        throw new Error('未取得授權連結')
+      }
+
       // 在新視窗中打開 Google 授權頁面
       const authWindow = window.open(
         redirectUrl,
