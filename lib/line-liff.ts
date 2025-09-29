@@ -100,9 +100,15 @@ export const lineLogin = (): void => {
     return
   }
   if (!liff.isLoggedIn()) {
-    liff.login({
-      redirectUri: LIFF_CONFIG.redirectUri
-    })
+    // 當 redirectUri 未正確設定時，改用預設行為（回到目前 URL）以避免 LINE 的 invalid url 錯誤
+    const uri = LIFF_CONFIG.redirectUri
+    const isValidUri = typeof uri === 'string' && uri.startsWith('http') && !uri.includes('your-domain.com')
+    if (isValidUri) {
+      liff.login({ redirectUri: uri })
+    } else {
+      console.warn('LIFF redirectUri 未設定或可能不正確，改用預設導向（目前頁面 URL）')
+      liff.login()
+    }
   }
 }
 
@@ -147,6 +153,21 @@ export const getAccessToken = (): string | null => {
     return null
   } catch (error) {
     console.error('取得存取權杖失敗:', error)
+    return null
+  }
+}
+
+// 取得 ID Token（用於預註冊流程驗證 LINE 身分）
+export const getIdToken = (): string | null => {
+  try {
+    if (shouldSkipLiff) return null
+    if (liff.isLoggedIn()) {
+      const token = (liff as any).getIDToken ? (liff as any).getIDToken() : null
+      return token || null
+    }
+    return null
+  } catch (error) {
+    console.error('取得 ID Token 失敗:', error)
     return null
   }
 }

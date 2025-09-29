@@ -164,6 +164,58 @@ export class ApiService {
     }
   }
 
+  // 專用：Onboard/註冊相關 API（走 /api/onboard 代理）
+  private static async requestOnboard<T>(
+    endpoint: string,
+    options: RequestInit = {}
+  ): Promise<ApiResponse<T>> {
+    try {
+      const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData
+      let baseUrl: string
+      if (typeof window !== 'undefined') {
+        baseUrl = '/api/onboard'
+      } else {
+        const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:8000'
+        baseUrl = `${backendUrl}/api/onboard`
+      }
+
+      const headers: Record<string, any> = {
+        'X-Line-User-Id': this.lineUserId,
+        ...(options.headers || {})
+      }
+      if (!isFormData) headers['Content-Type'] = 'application/json'
+
+      const response = await fetch(`${baseUrl}${endpoint}`, {
+        ...options,
+        headers,
+        cache: 'no-store'
+      })
+
+      if (!response.ok) {
+        const errText = await response.text().catch(() => '')
+        let errJson: any = {}
+        try { errJson = errText ? JSON.parse(errText) : {} } catch { errJson = {} }
+        return { error: errJson.message || `HTTP ${response.status}`, details: errJson || errText }
+      }
+
+      const contentType = response.headers.get('content-type') || ''
+      const raw = await response.text()
+      if (!raw) return { data: null as any }
+      if (!contentType.includes('application/json')) return { data: raw as any }
+      return { data: JSON.parse(raw) }
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : '網路錯誤' }
+    }
+  }
+
+  // 預註冊：提交 name/role/line_user_id 與 LINE id_token，回傳 Google OAuth URL
+  static async preRegister(payload: { id_token: string; line_user_id: string; role: 'teacher' | 'student'; name: string }) {
+    return this.requestOnboard<{ redirectUrl: string }>(`/pre_register/`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    })
+  }
+
   // 用戶相關 API
   static async getProfile(lineUserId: string) {
     return this.request(`/profile/${lineUserId}/`)

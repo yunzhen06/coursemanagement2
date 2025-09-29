@@ -19,6 +19,9 @@ const nextConfig = {
       // 備援：舊路徑
       { source: '/api/v2/:path*/', destination: `${apiBaseUrl}/api/v2/:path*/` },
       { source: '/api/v2/:path*', destination: `${apiBaseUrl}/api/v2/:path*/` },
+      // 註冊/Onboard 路徑
+      { source: '/api/onboard/:path*/', destination: `${apiBaseUrl}/api/onboard/:path*/` },
+      { source: '/api/onboard/:path*', destination: `${apiBaseUrl}/api/onboard/:path*/` },
       // OAuth Google URL 路由
       { source: '/api/oauth/:path*/', destination: `${apiBaseUrl}/api/oauth/:path*/` },
       { source: '/api/oauth/:path*', destination: `${apiBaseUrl}/api/oauth/:path*/` },

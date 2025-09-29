@@ -10,7 +10,9 @@ import { RegistrationNameInput } from '@/components/registration-name-input'
 import { RegistrationGoogleAuth } from '@/components/registration-google-auth'
 import { Card, CardContent } from '@/components/ui/card'
 import { CheckCircle, Loader2 } from 'lucide-react'
-import { closeLiffWindow } from '@/lib/line-liff'
+import { closeLiffWindow, getIdToken } from '@/lib/line-liff'
+import { ApiService } from '@/services/apiService'
+import { UserService } from '@/services/userService'
 // import { Button } from '@/components/ui/button'
 
 export default function RegistrationPage() {
@@ -34,15 +36,82 @@ export default function RegistrationPage() {
     lineUser
   } = useRegistrationFlow()
 
+  // 若已註冊，直接導向系統主頁
+  useEffect(() => {
+    const checkRegistered = async () => {
+      try {
+        const id = lineUser?.userId || data.lineUserId
+        if (!id) return
+        const registered = await UserService.getOnboardStatus(id)
+        if (registered) {
+          router.replace('/line')
+        }
+      } catch (e) {
+        console.warn('檢查註冊狀態失敗:', e)
+      }
+    }
+    checkRegistered()
+  }, [lineUser, data.lineUserId, router])
+
   // 不再自動重定向，讓註冊頁面處理 LINE 登入流程
 
   // Google 授權處理
   const handleGoogleAuth = async () => {
     try {
+      // 在 LINE/LIFF 內優先走預註冊：提交 name/role/id_token，避免姓名被後端預設覆蓋
+      const id = lineUser?.userId || data.lineUserId
+      const name = data.name
+      const role = data.role
+
+      const idToken = getIdToken()
+      const canPreRegister = !!id && !!name && !!role && !!idToken && !skipLiff
+
+      if (canPreRegister) {
+        const resp = await ApiService.preRegister({
+          id_token: idToken as string,
+          line_user_id: id!,
+          role: role!,
+          name
+        })
+
+        if (resp.error) {
+          throw new Error(resp.error)
+        }
+
+        const dataResp: any = resp.data || {}
+        const redirectUrl = dataResp.redirectUrl || dataResp.auth_url
+        if (!redirectUrl || typeof redirectUrl !== 'string') {
+          throw new Error('未取得 Google 授權連結')
+        }
+
+        const win = window.open(redirectUrl, '_blank', 'noopener,noreferrer')
+        if (!win) throw new Error('無法開啟授權視窗，請允許彈出視窗')
+
+        // 備援：授權視窗關閉後檢查連線並完成註冊流程
+        const checkTimer = setInterval(async () => {
+          try {
+            if (win.closed) {
+              clearInterval(checkTimer)
+              const test = await ApiService.testGoogleConnection()
+              if (test.data && (test.data as any).is_connected) {
+                // 設定已完成狀態並導向主頁
+                await completeRegistration()
+                router.replace('/line')
+              } else {
+                throw new Error('授權未完成或失敗')
+              }
+            }
+          } catch (e) {
+            console.error(e)
+          }
+        }, 1000)
+        return
+      }
+
+      // 非 LIFF 或取不到 id_token 時，退回原授權流程
       const userEmail = await authorizeGoogle()
       if (userEmail) {
         updateData({ googleEmail: userEmail })
-        // Google 授權成功後自動完成註冊
         const success = await completeRegistrationWithEmail(userEmail)
         if (success) {
           router.replace('/line')
@@ -50,7 +119,6 @@ export default function RegistrationPage() {
       }
     } catch (error) {
       console.error('Google 授權失敗:', error)
-      // 錯誤處理已在 useGoogleAuth 中處理
     }
   }
 
