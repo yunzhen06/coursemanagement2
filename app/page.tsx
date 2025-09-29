@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react"
 import { BottomNavigation } from "@/components/bottom-navigation"
 import { SidebarNavigation } from "@/components/sidebar-navigation"
 import { PageHeader } from "@/components/page-header"
+import { useLineAuth } from "@/hooks/use-line-auth"
 import { CourseForm } from "@/components/course-form"
 import { CourseCard } from "@/components/course-card"
 import { CourseDetail } from "@/components/course-detail"
@@ -60,12 +61,21 @@ export default function HomePage() {
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
   const [assignmentFilter, setAssignmentFilter] = useState("all")
   
-  // 訪客模式：初始化 lineUserId（優先用本地保存，否則產生 guest-<uuid>）
+  // 使用 LINE 認證獲取真實的 user ID
+  const { user: lineUser, isLoggedIn: isLineLoggedIn, isLoading: lineLoading } = useLineAuth()
   const [lineUserId, setLineUserId] = useState<string>("")
+  
   useEffect(() => {
-    const id = ApiService.bootstrapLineUserId()
-    setLineUserId(id)
-  }, [])
+    if (isLineLoggedIn && lineUser?.userId) {
+      // 使用真實的 LINE user ID
+      setLineUserId(lineUser.userId)
+      ApiService.setLineUserId(lineUser.userId)
+    } else {
+      // 如果沒有 LINE 登入，使用 guest ID 作為備援
+      const id = ApiService.bootstrapLineUserId()
+      setLineUserId(id)
+    }
+  }, [isLineLoggedIn, lineUser])
 
   // 從後端獲取用戶資料
   useEffect(() => {

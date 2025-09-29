@@ -5,8 +5,14 @@ import { useEffect, useState } from 'react'
 export default function TestPage() {
   const [result, setResult] = useState<string>('')
   const [loading, setLoading] = useState(false)
+  const [lineUserId, setLineUserId] = useState<string>('')
 
   const testDirectFetch = async () => {
+    if (!lineUserId.trim()) {
+      setResult('❌ 請輸入 LINE User ID\n')
+      return
+    }
+
     setLoading(true)
     setResult('開始測試...\n')
     
@@ -21,12 +27,12 @@ export default function TestPage() {
       }
       
       // 測試 API 請求
-      const url = `${apiBaseUrl}/web/courses/list/?line_user_id=guest-8f5eb095-81a8-4fec-b0ca-172ac37e202f&_ts=${Date.now()}`
+      const url = `${apiBaseUrl}/web/courses/list/?line_user_id=${lineUserId}&_ts=${Date.now()}`
       setResult(prev => prev + `請求 URL: ${url}\n`)
       
       const headers = {
         'Content-Type': 'application/json',
-        'X-Line-User-Id': 'guest-8f5eb095-81a8-4fec-b0ca-172ac37e202f',
+        'X-Line-User-Id': lineUserId,
         'ngrok-skip-browser-warning': 'true'
       }
       
@@ -68,6 +74,11 @@ export default function TestPage() {
   }
 
   const testApiService = async () => {
+    if (!lineUserId.trim()) {
+      setResult('❌ 請輸入 LINE User ID\n')
+      return
+    }
+
     setLoading(true)
     setResult('測試 ApiService...\n')
     
@@ -75,7 +86,7 @@ export default function TestPage() {
       const { ApiService } = await import('@/services/apiService')
       
       setResult(prev => prev + '調用 ApiService.getCourses...\n')
-      const result = await ApiService.getCourses('guest-8f5eb095-81a8-4fec-b0ca-172ac37e202f')
+      const result = await ApiService.getCourses(lineUserId)
       
       setResult(prev => prev + `ApiService 結果: ${JSON.stringify(result, null, 2)}\n`)
       
@@ -97,6 +108,20 @@ export default function TestPage() {
   return (
     <div className="p-8 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold mb-6">API 連接測試</h1>
+      
+      <div className="mb-6">
+        <label htmlFor="lineUserId" className="block text-sm font-medium text-gray-700 mb-2">
+          LINE User ID:
+        </label>
+        <input
+          type="text"
+          id="lineUserId"
+          value={lineUserId}
+          onChange={(e) => setLineUserId(e.target.value)}
+          placeholder="請輸入 LINE User ID"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
       
       <div className="space-x-4 mb-6">
         <button 

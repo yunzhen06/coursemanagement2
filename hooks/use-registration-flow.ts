@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useLineAuth } from './use-line-auth'
 import { UserService } from '@/services/userService'
+import { ApiService } from '@/services/apiService'
 
 export type UserRole = 'teacher' | 'student'
 
@@ -47,6 +48,8 @@ export function useRegistrationFlow() {
           lineUserId: lineUser.userId
         }
       }))
+      // 同步 ApiService 的 lineUserId，供後續 Google OAuth 使用
+      ApiService.setLineUserId(lineUser.userId)
     }
   }, [isLoggedIn, lineUser])
 
@@ -101,49 +104,33 @@ export function useRegistrationFlow() {
 
     try {
       // 驗證必要資料
-      if (!state.data.role || !state.data.name || !state.data.googleEmail || !state.data.lineUserId) {
+      if (!state.data.role || !state.data.name || !state.data.lineUserId) {
         throw new Error('註冊資料不完整')
       }
 
-      // 檢查 LINE User ID 是否已註冊
-      const lineUserExists = await UserService.checkLineUserExists(state.data.lineUserId)
-      if (lineUserExists) {
+      // 防重複：只要已完成 Google 綁定（有 refresh token），就視為已註冊
+      const alreadyRegistered = await UserService.getOnboardStatus(state.data.lineUserId)
+      if (alreadyRegistered) {
         throw new Error('此 LINE 帳號已經註冊過了')
       }
 
-      // 檢查 Google Email 是否已註冊
-      const googleEmailExists = await UserService.checkGoogleEmailExists(state.data.googleEmail)
-      if (googleEmailExists) {
-        throw new Error('此 Google 帳號已經註冊過了')
-      }
-
-      // 準備註冊資料
-      const registrationPayload = {
-        role: state.data.role,
+      // 只更新 Profile 的 name 與 role，Google 授權後端在 callback 中寫入
+      await ApiService.updateProfile(state.data.lineUserId, {
         name: state.data.name,
-        googleEmail: state.data.googleEmail,
-        lineUserId: state.data.lineUserId,
-        registeredAt: new Date().toISOString()
-      }
+        role: state.data.role
+      })
 
-      console.log('註冊資料:', registrationPayload)
-      
-      // 呼叫註冊 API
-      await UserService.registerUser(registrationPayload)
-      
-      // 發送註冊完成 Flex Message 到 LINE Bot
+      // 發送註冊完成 Flex Message 到 LINE Bot（可選）
       try {
         await UserService.sendRegistrationCompleteMessage(
           state.data.lineUserId,
           state.data.name,
-          state.data.role
+          state.data.role!
         )
-        console.log('註冊完成 Flex Message 發送成功')
       } catch (flexError) {
-        console.error('發送 Flex Message 失敗，但註冊已完成:', flexError)
-        // 不影響註冊流程，繼續執行
+        console.error('發送 Flex Message 失敗，但註冊已完成基本資料:', flexError)
       }
-      
+
       setState(prev => ({
         ...prev,
         isCompleted: true
@@ -166,54 +153,38 @@ export function useRegistrationFlow() {
 
     try {
       // 驗證必要資料
-      if (!state.data.role || !state.data.name || !googleEmail || !state.data.lineUserId) {
+      if (!state.data.role || !state.data.name || !state.data.lineUserId) {
         throw new Error('註冊資料不完整')
       }
 
-      // 檢查 LINE User ID 是否已註冊
-      const lineUserExists = await UserService.checkLineUserExists(state.data.lineUserId)
-      if (lineUserExists) {
+      const alreadyRegistered = await UserService.getOnboardStatus(state.data.lineUserId)
+      if (alreadyRegistered) {
         throw new Error('此 LINE 帳號已經註冊過了')
       }
 
-      // 檢查 Google Email 是否已註冊
-      const googleEmailExists = await UserService.checkGoogleEmailExists(googleEmail)
-      if (googleEmailExists) {
-        throw new Error('此 Google 帳號已經註冊過了')
-      }
-
-      // 準備註冊資料
-      const registrationPayload = {
-        role: state.data.role,
+      // 更新基本資料 + 暫存 email（非必要，後端 callback 也會寫入）
+      await ApiService.updateProfile(state.data.lineUserId, {
         name: state.data.name,
-        googleEmail: googleEmail,
-        lineUserId: state.data.lineUserId,
-        registeredAt: new Date().toISOString()
-      }
+        role: state.data.role,
+        email: googleEmail
+      })
 
-      console.log('註冊資料:', registrationPayload)
-      
-      // 呼叫註冊 API
-      await UserService.registerUser(registrationPayload)
-      
-      // 發送註冊完成 Flex Message 到 LINE Bot
+      // 仍保留發送註冊完成 Flex Message
       try {
         await UserService.sendRegistrationCompleteMessage(
           state.data.lineUserId,
           state.data.name,
-          state.data.role
+          state.data.role!
         )
-        console.log('註冊完成 Flex Message 發送成功')
       } catch (flexError) {
-        console.error('發送 Flex Message 失敗，但註冊已完成:', flexError)
-        // 不影響註冊流程，繼續執行
+        console.error('發送 Flex Message 失敗，但註冊已完成基本資料:', flexError)
       }
-      
+
       setState(prev => ({
         ...prev,
         data: {
           ...prev.data,
-          googleEmail: googleEmail
+          googleEmail
         },
         isCompleted: true
       }))

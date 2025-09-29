@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { ApiService } from '@/services/apiService'
+import { useLineAuth } from './use-line-auth'
 
 export interface GoogleAuthState {
   isAuthorized: boolean
@@ -11,6 +12,8 @@ export interface GoogleAuthState {
 }
 
 export function useGoogleAuth() {
+  const { user: lineUser, isLoggedIn: isLineLoggedIn } = useLineAuth()
+  
   const [state, setState] = useState<GoogleAuthState>({
     isAuthorized: false,
     isLoading: false,
@@ -39,15 +42,26 @@ export function useGoogleAuth() {
     setError(null)
 
     try {
+      // 確保使用真實的 LINE user ID
+      if (isLineLoggedIn && lineUser?.userId) {
+        ApiService.setLineUserId(lineUser.userId)
+      }
+      
       // 從後端獲取 Google OAuth URL
       const { redirectUrl } = await ApiService.getGoogleOAuthUrl()
-      
-      // 在新視窗中打開 Google 授權頁面
+
+      // 使用新標籤頁而不是彈出窗口來避免 disallowed_useragent 錯誤
       const authWindow = window.open(
         redirectUrl,
-        'google-auth',
-        'width=500,height=600,scrollbars=yes,resizable=yes'
+        '_blank',
+        'noopener,noreferrer'
       )
+
+      if (!authWindow) {
+        throw new Error('無法打開授權頁面，請允許瀏覽器開啟新標籤頁')
+      }
+
+      authWindow.focus()
 
       return new Promise((resolve, reject) => {
         // 監聽來自授權頁面的 postMessage
@@ -59,8 +73,6 @@ export function useGoogleAuth() {
           if (event.data.type === 'GOOGLE_AUTH_SUCCESS') {
             window.removeEventListener('message', handleMessage)
             authWindow?.close()
-            
-            // 假設成功後會返回用戶 email
             const userEmail = event.data.email || 'user@gmail.com'
             setAuthorized(true, userEmail)
             setLoading(false)
@@ -82,29 +94,25 @@ export function useGoogleAuth() {
             if (authWindow?.closed) {
               clearInterval(checkWindowClosed)
               window.removeEventListener('message', handleMessage)
-            
-            // 檢查授權狀態
-            setTimeout(async () => {
-              try {
-                const response = await ApiService.testGoogleConnection()
-                if (response.data && (response.data as any).is_connected) {
-                  // 模擬獲取用戶 email
-                  const userEmail = 'user@gmail.com'
-                  setAuthorized(true, userEmail)
-                  resolve(userEmail)
-                } else {
-                  setError('授權未完成或失敗')
-                  reject(new Error('授權未完成或失敗'))
+              setTimeout(async () => {
+                try {
+                  const response = await ApiService.testGoogleConnection()
+                  if (response.data && (response.data as any).is_connected) {
+                    const userEmail = 'user@gmail.com'
+                    setAuthorized(true, userEmail)
+                    resolve(userEmail)
+                  } else {
+                    setError('授權未完成或失敗')
+                    reject(new Error('授權未完成或失敗'))
+                  }
+                } catch (error) {
+                  setError('檢查授權狀態失敗')
+                  reject(new Error('檢查授權狀態失敗'))
                 }
-              } catch (error) {
-                setError('檢查授權狀態失敗')
-                reject(new Error('檢查授權狀態失敗'))
-              }
-              setLoading(false)
-            }, 1000)
+                setLoading(false)
+              }, 1000)
             }
           } catch (error) {
-            // 忽略 CORS 錯誤，繼續檢查
             console.warn('無法檢查視窗狀態 (CORS):', error)
           }
         }, 1000)
@@ -126,7 +134,7 @@ export function useGoogleAuth() {
       setLoading(false)
       throw error
     }
-  }, [])
+  }, [isLineLoggedIn, lineUser])
 
   const checkAuthStatus = useCallback(async () => {
     try {

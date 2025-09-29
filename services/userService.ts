@@ -51,7 +51,7 @@ export class UserService {
    */
   static async getUserByLineId(lineUserId: string): Promise<UserProfile | null> {
     try {
-      const response = await fetch(`${this.baseUrl}/api/users/line/${lineUserId}`)
+      const response = await fetch(`${this.baseUrl}/api/v2/profile/${lineUserId}/`)
 
       if (response.status === 404) {
         return null // 用戶不存在
@@ -216,6 +216,24 @@ export class UserService {
       return true
     } catch (error) {
       console.error('發送註冊完成 Flex Message 失敗:', error)
+      return false
+    }
+  }
+
+  /**
+   * 查詢是否已完成綁定（註冊完成）：後端依據 google_refresh_token 是否存在判定
+   */
+  static async getOnboardStatus(lineUserId: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/api/onboard/status/${lineUserId}/`)
+      if (!response.ok) {
+        console.error('查詢註冊狀態失敗:', response.status, response.statusText)
+        return false
+      }
+      const data = await response.json()
+      return !!(data && (data as any).registered)
+    } catch (error) {
+      console.error('查詢註冊狀態失敗:', error)
       return false
     }
   }

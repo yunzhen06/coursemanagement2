@@ -1,6 +1,8 @@
 import type { NextRequest } from "next/server"
 
 export const runtime = "nodejs"
+// 避免 Next.js 嘗試靜態化
+export const dynamic = "force-dynamic"
 
 export async function GET(_req: NextRequest) {
   let intervalId: NodeJS.Timeout | null = null

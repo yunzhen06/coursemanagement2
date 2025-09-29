@@ -1,6 +1,24 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v2'
-const DEFAULT_GUEST_LINE_USER_ID = 'guest-8f5eb095-81a8-4fec-b0ca-172ac37e202f'
+// 根據環境設定 API 基礎 URL
+function getApiBaseUrl(): string {
+  // 在瀏覽器環境中，使用 Next.js 代理
+  if (typeof window !== 'undefined') {
+    return '/api/v2'
+  }
+  
+  // 在伺服器環境中，使用環境變數或預設值
+  return process.env.BACKEND_API_URL ? `${process.env.BACKEND_API_URL}/api/v2` : 'http://localhost:8000/api/v2'
+}
 
+const API_BASE_URL = getApiBaseUrl()
+
+// 取得後端基礎 URL (不包含 /api/v2)
+function getBackendBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    return ''
+  }
+  
+  return process.env.BACKEND_API_URL || 'http://localhost:8000'
+}
 export interface ApiResponse<T> {
   data?: T
   error?: string
@@ -9,22 +27,22 @@ export interface ApiResponse<T> {
 }
 
 export class ApiService {
-  private static lineUserId: string = DEFAULT_GUEST_LINE_USER_ID
+  private static lineUserId: string = ''
   static get backendOrigin() {
     try { return new URL(API_BASE_URL).origin } catch { return '' }
   }
 
   static setLineUserId(userId: string) {
-    // 強制使用可用的 guest ID 以避免 403（後端 web_* 端點需要存在用戶）
-    if (typeof userId === 'string' && userId.startsWith('guest-')) {
+    // 設定用戶 ID
+    if (typeof userId === 'string' && userId.trim()) {
       this.lineUserId = userId
     } else {
-      this.lineUserId = DEFAULT_GUEST_LINE_USER_ID
+      console.warn('Invalid LINE User ID provided')
     }
   }
 
   private static ensureLineUserId(): string {
-    if (this.lineUserId && this.lineUserId.startsWith('guest-')) return this.lineUserId
+    if (this.lineUserId && this.lineUserId.trim()) return this.lineUserId
     return this.bootstrapLineUserId()
   }
 
@@ -39,15 +57,15 @@ export class ApiService {
       const KEY = 'lineUserId'
       let id = localStorage.getItem(KEY) || ''
       if (!id) {
-        // 使用指定的預設訪客 ID，若未來需要可改為亂數
-        id = DEFAULT_GUEST_LINE_USER_ID
+        // 動態生成訪客 ID
+        id = `guest-${crypto.randomUUID()}`
         localStorage.setItem(KEY, id)
       }
       this.setLineUserId(id)
       return id
     } catch {
       // 無法使用 localStorage 時，回退為臨時 ID（不持久化）
-      const temp = this.lineUserId || DEFAULT_GUEST_LINE_USER_ID
+      const temp = this.lineUserId || `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
       this.setLineUserId(temp)
       return temp
     }
@@ -693,20 +711,35 @@ export class ApiService {
       'X-Line-User-Id': this.lineUserId,
     }
     
+    // 建構正確的 OAuth URL
+    const backendUrl = getBackendBaseUrl()
+    const oauthUrl = typeof window !== 'undefined' 
+      ? '/api/oauth/google/url/'  // 瀏覽器環境：使用代理
+      : `${backendUrl}/api/oauth/google/url/`  // 伺服器環境：直接連接到後端
+    
     // 如果 API_BASE_URL 包含 ngrok-free.app，添加 ngrok-skip-browser-warning header
     if (API_BASE_URL.includes('ngrok-free.app')) {
       headers['ngrok-skip-browser-warning'] = 'true'
     }
     
-    const response = await fetch(`${API_BASE_URL.replace('/api/v2', '')}/api/oauth/google/url/`, {
+    const response = await fetch(oauthUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify({ line_user_id: this.lineUserId }),
     })
     
     if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || 'Failed to get Google OAuth URL')
+      const errorText = await response.text()
+      let errorMessage = 'Failed to get Google OAuth URL'
+      
+      try {
+        const errorData = JSON.parse(errorText)
+        errorMessage = errorData.error || errorMessage
+      } catch {
+        errorMessage = errorText || errorMessage
+      }
+      
+      throw new Error(errorMessage)
     }
     
     return response.json()

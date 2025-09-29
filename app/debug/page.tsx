@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 
 export default function DebugPage() {
   const [envVars, setEnvVars] = useState<Record<string, string>>({})
+  const [lineUserId, setLineUserId] = useState<string>('')
 
   useEffect(() => {
     // 檢查環境變數
@@ -16,16 +17,22 @@ export default function DebugPage() {
   }, [])
 
   const testApiConnection = async () => {
+    if (!lineUserId.trim()) {
+      console.error('❌ 請輸入 LINE User ID')
+      alert('請輸入 LINE User ID')
+      return
+    }
+
     try {
       console.log('🔍 測試 API 連接...')
       console.log('API_BASE_URL:', process.env.NEXT_PUBLIC_API_BASE_URL)
       
-      const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/web/courses/list/?line_user_id=guest-8f5eb095-81a8-4fec-b0ca-172ac37e202f&_ts=${Date.now()}`
+      const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/web/courses/list/?line_user_id=${lineUserId}&_ts=${Date.now()}`
       console.log('請求 URL:', url)
       
       const headers = {
         'Content-Type': 'application/json',
-        'X-Line-User-Id': 'guest-8f5eb095-81a8-4fec-b0ca-172ac37e202f',
+        'X-Line-User-Id': lineUserId,
         'ngrok-skip-browser-warning': 'true'
       }
       console.log('請求 Headers:', headers)
@@ -57,13 +64,19 @@ export default function DebugPage() {
   }
 
   const testApiServiceConnection = async () => {
+    if (!lineUserId.trim()) {
+      console.error('❌ 請輸入 LINE User ID')
+      alert('請輸入 LINE User ID')
+      return
+    }
+
     try {
       console.log('🔍 測試 ApiService.getCourses...')
       
       // 動態導入 ApiService 以確保在客戶端執行
       const { ApiService } = await import('@/services/apiService')
       
-      const result = await ApiService.getCourses('guest-8f5eb095-81a8-4fec-b0ca-172ac37e202f')
+      const result = await ApiService.getCourses(lineUserId)
       console.log('✅ ApiService.getCourses 結果:', result)
       
       if (result.error) {
@@ -96,6 +109,19 @@ export default function DebugPage() {
 
       <div className="mb-8">
         <h2 className="text-xl font-semibold mb-4">API 連接測試</h2>
+        <div className="mb-4">
+          <label htmlFor="lineUserId" className="block text-sm font-medium text-gray-700 mb-2">
+            LINE User ID:
+          </label>
+          <input
+            type="text"
+            id="lineUserId"
+            value={lineUserId}
+            onChange={(e) => setLineUserId(e.target.value)}
+            placeholder="請輸入 LINE User ID"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
         <div className="space-x-4">
           <button 
             onClick={testApiConnection}

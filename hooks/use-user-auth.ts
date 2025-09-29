@@ -22,17 +22,16 @@ export function useUserAuth() {
     needsRegistration: false
   })
 
-  // 檢查用戶是否已註冊
+  // 檢查用戶是否已註冊（以 google_refresh_token 是否存在為準）
   const checkUserRegistration = async (lineUserId: string) => {
     try {
       setAuthState(prev => ({ ...prev, isLoading: true, error: null }))
 
-      const user = await UserService.getUserByLineId(lineUserId)
-      
-      if (user) {
-        // 用戶已註冊，記錄登入
+      const registered = await UserService.getOnboardStatus(lineUserId)
+      if (registered) {
+        // 已註冊則讀取詳細 Profile
+        const user = await UserService.getUserByLineId(lineUserId)
         await UserService.recordLogin(lineUserId)
-        
         setAuthState({
           isAuthenticated: true,
           user,
@@ -41,7 +40,7 @@ export function useUserAuth() {
           needsRegistration: false
         })
       } else {
-        // 用戶未註冊，需要進行註冊流程
+        // 未註冊，進入註冊流程
         setAuthState({
           isAuthenticated: false,
           user: null,
