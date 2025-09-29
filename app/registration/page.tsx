@@ -61,9 +61,8 @@ export default function RegistrationPage() {
         // 忽略錯誤，保持在註冊頁
       }
     }
-    // 僅在 LINE 使用者 ID 改變時檢查；避免嚴格模式造成的重複執行
-    didCheckRef.current = false
-    if (!didCheckRef.current) {
+    // 僅在第一次渲染且取得有效 LINE 使用者 ID 時檢查；避免嚴格模式造成的重複執行
+    if (!didCheckRef.current && uidMemo) {
       didCheckRef.current = true
       checkRegistered()
     }
