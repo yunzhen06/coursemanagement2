@@ -20,7 +20,10 @@ export interface UserProfile {
 }
 
 export class UserService {
-  private static baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+  // 在瀏覽器端使用相對路徑，交由 Next.js rewrites 代理；在伺服器端使用環境變數
+  private static baseUrl = (typeof window !== 'undefined')
+    ? ''
+    : (process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
 
   /**
    * 註冊新用戶並綁定 LINE User ID 與 Google Email
