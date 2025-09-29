@@ -6,8 +6,10 @@ export default function GoogleAuthSuccessPage() {
   useEffect(() => {
     // 通知父視窗授權成功
     if (window.opener) {
+      const params = new URLSearchParams(window.location.search)
+      const email = params.get('email') || ''
       window.opener.postMessage(
-        { type: 'GOOGLE_AUTH_SUCCESS' },
+        { type: 'GOOGLE_AUTH_SUCCESS', email },
         window.location.origin
       )
     }

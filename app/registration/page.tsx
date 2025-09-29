@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useRegistrationFlow } from '@/hooks/use-registration-flow'
+import { UserService } from '@/services/userService'
 import { useLineAuth } from '@/hooks/use-line-auth'
 import { useGoogleAuth } from '@/hooks/use-google-auth'
 import { RegistrationRoleSelection } from '@/components/registration-role-selection'
@@ -35,6 +36,24 @@ export default function RegistrationPage() {
   } = useRegistrationFlow()
 
   // 不再自動重定向，讓註冊頁面處理 LINE 登入流程
+
+  // 已註冊使用者導向守衛：若已綁定則離開註冊頁
+  useEffect(() => {
+    const checkRegistered = async () => {
+      try {
+        const uid = lineUser?.userId
+        if (!uid) return
+        const registered = await UserService.getOnboardStatus(uid)
+        if (registered) {
+          router.replace('/line')
+        }
+      } catch (e) {
+        // 忽略錯誤，保持在註冊頁
+      }
+    }
+    checkRegistered()
+    // 僅在 LINE 使用者 ID 改變時檢查
+  }, [lineUser?.userId])
 
   // Google 授權處理
   const handleGoogleAuth = async () => {
