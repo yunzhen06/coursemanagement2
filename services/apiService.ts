@@ -130,6 +130,8 @@ export class ApiService {
           // 合併 CSRF 標頭（若存在）
           ...createCsrfHeaders()
         },
+        // 確保 cookies (csrftoken、session) 會隨請求送出
+        credentials: 'include',
         // 避免瀏覽器層快取舊資料
         cache: 'no-store'
       })
