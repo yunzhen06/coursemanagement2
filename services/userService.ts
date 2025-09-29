@@ -236,7 +236,16 @@ export class UserService {
    */
   static async getOnboardStatus(lineUserId: string): Promise<boolean> {
     try {
-      const response = await fetch(`${this.getOnboardBase()}/onboard/status/${lineUserId}/`)
+      const url = `${this.getOnboardBase()}/onboard/status/${lineUserId}/`
+      console.log('[UserService] 查詢註冊狀態 URL:', url)
+      const response = await fetch(url, {
+        headers: {
+          'Accept': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
+        credentials: 'include',
+        cache: 'no-store',
+      })
       if (!response.ok) {
         console.error('查詢註冊狀態失敗:', response.status, response.statusText)
         return false
