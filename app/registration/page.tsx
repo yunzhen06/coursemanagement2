@@ -176,7 +176,7 @@ export default function RegistrationPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <Button 
-              onClick={() => router.push('/dashboard')}
+              onClick={() => router.push('/')}
               className="flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700"
             >
               <BookOpen className="w-4 h-4" />
