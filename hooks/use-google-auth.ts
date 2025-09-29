@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { ApiService } from '@/services/apiService'
+import { getIdToken } from '@/lib/line-liff'
 import { useLineAuth } from './use-line-auth'
 
 export interface GoogleAuthState {
@@ -37,7 +38,7 @@ export function useGoogleAuth() {
     }))
   }
 
-  const authorize = useCallback(async (): Promise<string | null> => {
+  const authorize = useCallback(async (payload?: { role?: 'teacher' | 'student'; name?: string }): Promise<string | null> => {
     setLoading(true)
     setError(null)
 
@@ -47,8 +48,28 @@ export function useGoogleAuth() {
         ApiService.setLineUserId(lineUser.userId)
       }
       
-      // 從後端獲取 Google OAuth URL
-      const resp = await ApiService.getGoogleOAuthUrl()
+      // 1) 如果在 LIFF 且提供 role/name，優先走預註冊流程（需要 id_token + CSRF）
+      let resp: any
+      const hasRegistrationPayload = !!(payload?.role && payload?.name)
+      const canUsePreRegister = isLineLoggedIn && !!lineUser?.userId && hasRegistrationPayload
+
+      if (canUsePreRegister) {
+        const idToken = getIdToken()
+        if (typeof idToken === 'string' && idToken.trim()) {
+          resp = await ApiService.preRegister({
+            id_token: idToken,
+            role: payload!.role!,
+            name: payload!.name!,
+          })
+        } else {
+          // 取不到 id_token 時退回直接 OAuth
+          resp = await ApiService.getGoogleOAuthUrl()
+        }
+      } else {
+        // 2) 其他情況（非 LIFF 或沒有 role/name），走直接 OAuth（csrf_exempt）
+        resp = await ApiService.getGoogleOAuthUrl()
+      }
+
       if (resp.error) {
         throw new Error(resp.error)
       }

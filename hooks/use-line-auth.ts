@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { ApiService } from '@/services/apiService'
 import { 
   initializeLiff, 
   isInLineApp, 
@@ -11,8 +12,11 @@ import {
   validateLiffConfig
 } from '@/lib/line-liff'
 
-// 不再於本地自動跳過；僅由環境變數控制是否跳過（預設不跳過）
-const shouldSkipLiffLocal = process.env.NEXT_PUBLIC_SKIP_LIFF_LOCAL === 'true'
+// 本地預設跳過條件：顯式設定或開發環境且未設定 LIFF ID
+const shouldSkipLiffLocal = (
+  process.env.NEXT_PUBLIC_SKIP_LIFF_LOCAL === 'true' ||
+  (!process.env.NEXT_PUBLIC_LIFF_ID && (process.env.NODE_ENV !== 'production'))
+)
 
 interface LineUser {
   userId: string
@@ -44,8 +48,46 @@ export const useLineAuth = () => {
   useEffect(() => {
     const initLiff = async () => {
       try {
+        // 在本地或未設定 LIFF ID 時，直接跳過並設定假 userId
+        if (shouldSkipLiffLocal) {
+          const KEY = 'lineUserId'
+          let dummyId = ''
+          if (typeof window !== 'undefined') {
+            dummyId = localStorage.getItem(KEY) || `guest-local-${Math.random().toString(36).slice(2, 8)}-${Date.now()}`
+            localStorage.setItem(KEY, dummyId)
+          } else {
+            dummyId = `guest-local-${Date.now()}`
+          }
+          ApiService.setLineUserId(dummyId)
+
+          setState({
+            isInitialized: true,
+            isInLineApp: false,
+            isLoggedIn: false,
+            user: { userId: dummyId, displayName: 'Local Guest' },
+            isLoading: false,
+            error: null
+          })
+          console.log('✅ 本地模式：已跳過 LIFF 並使用假 userId', dummyId)
+          return
+        }
+
         console.log('🔄 useLineAuth: 設置 loading 狀態')
         setState(prev => ({ ...prev, isLoading: true, error: null }))
+        // 非本地跳過時，若存在假 lineUserId 則清除
+        try {
+          if (!shouldSkipLiffLocal && typeof window !== 'undefined') {
+            const KEY = 'lineUserId'
+            const existing = localStorage.getItem(KEY)
+            if (existing && existing.startsWith('guest-local-')) {
+              localStorage.removeItem(KEY)
+              ApiService.setLineUserId('')
+              console.log('🧹 已清除本地假 lineUserId')
+            }
+          }
+        } catch (e) {
+          console.warn('清除假 lineUserId 時發生警告', e)
+        }
         
         console.log('🚀 useLineAuth: 調用 initializeLiff')
         const initialized = await initializeLiff()
@@ -105,6 +147,17 @@ export const useLineAuth = () => {
             console.log('👤 useLineAuth: 獲取用戶資料')
             user = await getUserProfile()
             console.log('👤 useLineAuth: 用戶資料:', user)
+            // 登入後同步真實 lineUserId 至 ApiService 與 localStorage
+            try {
+              if (user?.userId) {
+                ApiService.setLineUserId(user.userId)
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('lineUserId', user.userId)
+                }
+              }
+            } catch (e) {
+              console.warn('同步真實 lineUserId 時發生警告', e)
+            }
           }
           
           console.log('✅ useLineAuth: 設置最終狀態')

@@ -31,8 +31,11 @@ export function useRegistrationFlow() {
       role: null,
       name: '',
       googleEmail: '',
-      // 在未登入 LINE 時，預先使用訪客 ID 以便本地測試
-      lineUserId: ApiService.getLineUserId() || ApiService.bootstrapLineUserId()
+      // 在正式環境避免預設使用假 ID；僅於本地跳過時回退
+      lineUserId: (
+        ApiService.getLineUserId() ||
+        (process.env.NEXT_PUBLIC_SKIP_LIFF_LOCAL === 'true' ? ApiService.bootstrapLineUserId() : '')
+      )
     },
     isCompleted: false,
     isLoading: false,

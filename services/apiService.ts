@@ -87,7 +87,7 @@ export class ApiService {
     endpoint: string, 
     options: RequestInit = {},
     // 新增：API 路徑前綴，預設為 /api/v2
-    apiPrefix: 'v2' | 'oauth' | 'other' = 'v2'
+    apiPrefix: 'v2' | 'oauth' | 'onboard' | 'other' = 'v2'
   ): Promise<ApiResponse<T>> {
     try {
       const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData
@@ -96,13 +96,15 @@ export class ApiService {
       let baseUrl: string
       if (typeof window !== 'undefined') {
         // 瀏覽器端，使用相對路徑代理
-        baseUrl = apiPrefix === 'oauth' ? '/api/oauth' : '/api/v2'
+        if (apiPrefix === 'oauth') baseUrl = '/api/oauth'
+        else if (apiPrefix === 'onboard') baseUrl = '/api'
+        else baseUrl = '/api/v2'
       } else {
         // 伺服器端，使用環境變數
         const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:8000'
-        baseUrl = apiPrefix === 'oauth' 
-          ? `${backendUrl}/api/oauth` 
-          : `${backendUrl}/api/v2`
+        if (apiPrefix === 'oauth') baseUrl = `${backendUrl}/api/oauth`
+        else if (apiPrefix === 'onboard') baseUrl = `${backendUrl}/api`
+        else baseUrl = `${backendUrl}/api/v2`
       }
 
       const baseHeaders: Record<string, any> = {
@@ -162,58 +164,6 @@ export class ApiService {
         error: error instanceof Error ? error.message : '網路錯誤'
       }
     }
-  }
-
-  // 專用：Onboard/註冊相關 API（走 /api/onboard 代理）
-  private static async requestOnboard<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<ApiResponse<T>> {
-    try {
-      const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData
-      let baseUrl: string
-      if (typeof window !== 'undefined') {
-        baseUrl = '/api/onboard'
-      } else {
-        const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:8000'
-        baseUrl = `${backendUrl}/api/onboard`
-      }
-
-      const headers: Record<string, any> = {
-        'X-Line-User-Id': this.lineUserId,
-        ...(options.headers || {})
-      }
-      if (!isFormData) headers['Content-Type'] = 'application/json'
-
-      const response = await fetch(`${baseUrl}${endpoint}`, {
-        ...options,
-        headers,
-        cache: 'no-store'
-      })
-
-      if (!response.ok) {
-        const errText = await response.text().catch(() => '')
-        let errJson: any = {}
-        try { errJson = errText ? JSON.parse(errText) : {} } catch { errJson = {} }
-        return { error: errJson.message || `HTTP ${response.status}`, details: errJson || errText }
-      }
-
-      const contentType = response.headers.get('content-type') || ''
-      const raw = await response.text()
-      if (!raw) return { data: null as any }
-      if (!contentType.includes('application/json')) return { data: raw as any }
-      return { data: JSON.parse(raw) }
-    } catch (error) {
-      return { error: error instanceof Error ? error.message : '網路錯誤' }
-    }
-  }
-
-  // 預註冊：提交 name/role/line_user_id 與 LINE id_token，回傳 Google OAuth URL
-  static async preRegister(payload: { id_token: string; line_user_id: string; role: 'teacher' | 'student'; name: string }) {
-    return this.requestOnboard<{ redirectUrl: string }>(`/pre_register/`, {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    })
   }
 
   // 用戶相關 API
@@ -799,6 +749,33 @@ export class ApiService {
       method: 'POST',
       body: JSON.stringify({ line_user_id: this.lineUserId }),
     }, 'oauth')
+  }
+
+  // 預註冊（LIFF）取得 Google 授權 URL，需 CSRF 與 id_token
+  static async preRegister(params: { id_token: string; role: 'teacher' | 'student'; name: string }) {
+    const { id_token, role, name } = params
+    if (!this.lineUserId) {
+      this.bootstrapLineUserId()
+    }
+
+    // 需要在瀏覽器端先取得 CSRF cookie
+    if (typeof window !== 'undefined') {
+      try { await fetchCsrfToken('') } catch {}
+    }
+
+    return this.request<{ redirectUrl: string }>(
+      '/onboard/pre_register/',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          id_token,
+          line_user_id: this.lineUserId,
+          role,
+          name,
+        }),
+      },
+      'onboard'
+    )
   }
 
   // Google Calendar 相關 API

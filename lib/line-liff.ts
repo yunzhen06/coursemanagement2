@@ -4,8 +4,11 @@ import liff from '@line/liff'
 const isDevelopment = process.env.NODE_ENV === 'development' || 
                      process.env.NEXT_PUBLIC_IS_DEVELOPMENT === 'true'
 
-// 是否跳過 LIFF：僅由環境變數控制，預設不跳過（全面開啟真實流程）
-const shouldSkipLiff = process.env.NEXT_PUBLIC_SKIP_LIFF_LOCAL === 'true'
+// 是否跳過 LIFF：顯式設定，或在開發環境未設定 LIFF ID 時自動跳過
+const shouldSkipLiff = (
+  process.env.NEXT_PUBLIC_SKIP_LIFF_LOCAL === 'true' ||
+  (!process.env.NEXT_PUBLIC_LIFF_ID && isDevelopment)
+)
 
 // LINE LIFF 配置
 export const LIFF_CONFIG = {
@@ -22,7 +25,7 @@ export const initializeLiff = async (): Promise<boolean> => {
   try {
     // 僅在顯式設定跳過時才略過初始化
     if (shouldSkipLiff) {
-      console.log('⚠️ 已設定 NEXT_PUBLIC_SKIP_LIFF_LOCAL=true，跳過 LIFF 初始化與登入流程')
+      console.log('⚠️ 本地或未設定 LIFF ID，跳過 LIFF 初始化與登入流程')
       return true
     }
 
@@ -100,15 +103,9 @@ export const lineLogin = (): void => {
     return
   }
   if (!liff.isLoggedIn()) {
-    // 當 redirectUri 未正確設定時，改用預設行為（回到目前 URL）以避免 LINE 的 invalid url 錯誤
-    const uri = LIFF_CONFIG.redirectUri
-    const isValidUri = typeof uri === 'string' && uri.startsWith('http') && !uri.includes('your-domain.com')
-    if (isValidUri) {
-      liff.login({ redirectUri: uri })
-    } else {
-      console.warn('LIFF redirectUri 未設定或可能不正確，改用預設導向（目前頁面 URL）')
-      liff.login()
-    }
+    liff.login({
+      redirectUri: LIFF_CONFIG.redirectUri
+    })
   }
 }
 
@@ -157,17 +154,18 @@ export const getAccessToken = (): string | null => {
   }
 }
 
-// 取得 ID Token（用於預註冊流程驗證 LINE 身分）
+// 取得 LIFF id_token（供後端 pre_register 使用）
 export const getIdToken = (): string | null => {
   try {
     if (shouldSkipLiff) return null
     if (liff.isLoggedIn()) {
+      // liff.getIDToken 於 v2 取得 ID Token
       const token = (liff as any).getIDToken ? (liff as any).getIDToken() : null
-      return token || null
+      return typeof token === 'string' ? token : null
     }
     return null
   } catch (error) {
-    console.error('取得 ID Token 失敗:', error)
+    console.error('取得 id_token 失敗:', error)
     return null
   }
 }
