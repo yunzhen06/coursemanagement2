@@ -22,7 +22,7 @@ export interface UserProfile {
 export class UserService {
   // 在瀏覽器端使用相對路徑，交由 Next.js rewrites 代理；在伺服器端使用環境變數
   private static baseUrl = (typeof window !== 'undefined')
-    ? ''
+    ? (process.env.NEXT_PUBLIC_API_BASE_URL || '')
     : (process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
 
   /**
@@ -228,7 +228,7 @@ export class UserService {
    */
   static async getOnboardStatus(lineUserId: string): Promise<boolean> {
     try {
-      const response = await fetch(`${this.baseUrl}/api/onboard/status/${lineUserId}/`)
+      const response = await fetch(`${this.baseUrl ? this.baseUrl.replace(/\/+$/,'') : ''}/onboard/status/${lineUserId}/`)
       if (!response.ok) {
         console.error('查詢註冊狀態失敗:', response.status, response.statusText)
         return false

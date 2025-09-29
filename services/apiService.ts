@@ -95,10 +95,18 @@ export class ApiService {
       // 根據前綴決定基礎 URL
       let baseUrl: string
       if (typeof window !== 'undefined') {
-        // 瀏覽器端，使用相對路徑代理
-        if (apiPrefix === 'oauth') baseUrl = '/api/oauth'
-        else if (apiPrefix === 'onboard') baseUrl = '/api'
-        else baseUrl = '/api/v2'
+        // 瀏覽器端，優先使用公開環境變數作為後端 API 基底
+        const publicApiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/+$/,'')
+        if (publicApiBase) {
+          if (apiPrefix === 'oauth') baseUrl = `${publicApiBase}/oauth`
+          else if (apiPrefix === 'onboard') baseUrl = `${publicApiBase}`
+          else baseUrl = `${publicApiBase}/v2`
+        } else {
+          // 後援：未設定環境變數時走 Next.js 代理
+          if (apiPrefix === 'oauth') baseUrl = '/api/oauth'
+          else if (apiPrefix === 'onboard') baseUrl = '/api'
+          else baseUrl = '/api/v2'
+        }
       } else {
         // 伺服器端，使用環境變數
         const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:8000'
@@ -115,10 +123,8 @@ export class ApiService {
         baseHeaders['Content-Type'] = 'application/json'
       }
 
-      // 如果 baseUrl 包含 ngrok-free.app，添加 ngrok-skip-browser-warning header
-      if (baseUrl.includes('ngrok-free.app')) {
-        baseHeaders['ngrok-skip-browser-warning'] = 'true'
-      }
+      // 無論目標是否為 ngrok，統一添加 ngrok-skip-browser-warning 以避免警告頁阻擋
+      baseHeaders['ngrok-skip-browser-warning'] = 'true'
 
       const fullUrl = `${baseUrl}${endpoint}`
       console.log(`[API] Making request to: ${fullUrl}`)
