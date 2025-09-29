@@ -241,6 +241,12 @@ export class UserService {
         console.error('查詢註冊狀態失敗:', response.status, response.statusText)
         return false
       }
+      // 防止收到 HTML（例如 404/錯誤頁）導致 JSON 解析失敗
+      const contentType = response.headers.get('content-type') || ''
+      if (!contentType.toLowerCase().includes('application/json')) {
+        console.error('查詢註冊狀態失敗: 非 JSON 響應', contentType)
+        return false
+      }
       const data = await response.json()
       return !!(data && (data as any).registered)
     } catch (error) {
