@@ -19,23 +19,52 @@ export function AuthGate({ children }: AuthGateProps) {
   })
   const { isLoading: lineLoading, isLoggedIn } = useLineAuth()
 
+  // 本地開發環境跳過條件
+  const shouldSkipLiffLocal = (
+    process.env.NEXT_PUBLIC_SKIP_LIFF_LOCAL === 'true' ||
+    (!process.env.NEXT_PUBLIC_LIFF_ID && (process.env.NODE_ENV !== 'production'))
+  )
+
   useEffect(() => {
     if (isRegistrationPage) return
 
     if (!lineLoading && !authLoading) {
-      const shouldBlock = !isLoggedIn || !lineProfile?.userId || needsRegistration || !isAuthenticated
-      if (shouldBlock) {
+      // 在本地開發環境中，只要有 lineProfile?.userId 就允許進入
+      if (shouldSkipLiffLocal) {
+        if (!lineProfile?.userId) {
+          router.replace('/registration')
+        }
+        return
+      }
+
+      // 伺服器環境：檢查是否需要註冊，但允許已登入用戶進入
+      if (!lineProfile?.userId) {
         router.replace('/registration')
+        return
+      }
+
+      // 如果用戶已登入但需要註冊，重定向到註冊頁面
+      if (needsRegistration) {
+        router.replace('/registration')
+        return
       }
     }
-  }, [isRegistrationPage, lineLoading, authLoading, isLoggedIn, needsRegistration, isAuthenticated, lineProfile?.userId, router])
+  }, [isRegistrationPage, lineLoading, authLoading, isLoggedIn, needsRegistration, isAuthenticated, lineProfile?.userId, router, shouldSkipLiffLocal])
 
   if (isRegistrationPage) {
     return <>{children}</>
   }
 
-  if (!lineLoading && !authLoading && isLoggedIn && lineProfile?.userId && isAuthenticated && !needsRegistration) {
-    return <>{children}</>
+  // 在本地開發環境中，只要有 lineProfile?.userId 就允許進入
+  if (shouldSkipLiffLocal) {
+    if (!lineLoading && !authLoading && lineProfile?.userId) {
+      return <>{children}</>
+    }
+  } else {
+    // 伺服器環境：只要有 lineProfile?.userId 且不需要註冊就允許進入
+    if (!lineLoading && !authLoading && lineProfile?.userId && !needsRegistration) {
+      return <>{children}</>
+    }
   }
 
   return (
