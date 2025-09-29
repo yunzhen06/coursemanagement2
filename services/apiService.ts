@@ -1,3 +1,5 @@
+import { createCsrfHeaders } from '@/lib/csrf-token'
+
 // 根據環境設定 API 基礎 URL
 function getApiBaseUrl(): string {
   // 在瀏覽器環境中，使用 Next.js 代理
@@ -18,6 +20,22 @@ function getBackendBaseUrl(): string {
   }
   
   return process.env.BACKEND_API_URL || 'http://localhost:8000'
+}
+
+// 取得 CSRF token
+function getCsrfToken(): string | null {
+  if (typeof window === 'undefined') {
+    return null
+  }
+  
+  const cookies = document.cookie.split(';')
+  for (let i = 0; i < cookies.length; i++) {
+    const cookie = cookies[i].trim()
+    if (cookie.startsWith('csrftoken=')) {
+      return decodeURIComponent(cookie.substring(10))
+    }
+  }
+  return null
 }
 export interface ApiResponse<T> {
   data?: T
@@ -710,6 +728,10 @@ export class ApiService {
       'Content-Type': 'application/json',
       'X-Line-User-Id': this.lineUserId,
     }
+    
+    // 添加 CSRF token（如果可用）
+    const csrfHeaders = createCsrfHeaders()
+    Object.assign(headers, csrfHeaders)
     
     // 建構正確的 OAuth URL
     const backendUrl = getBackendBaseUrl()
