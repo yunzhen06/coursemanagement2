@@ -81,15 +81,28 @@ export function useGoogleAuth() {
           resp = await ApiService.getGoogleOAuthUrl()
         } catch {}
       }
-      const data: any = resp?.data || {}
-      let redirectUrl: string = data.redirectUrl || data.auth_url || ''
-      if (!redirectUrl || typeof redirectUrl !== 'string') {
+
+      // 統一解析可能的欄位名稱：redirectUrl / auth_url / url
+      const extractRedirectUrl = (r: any): string => {
+        try {
+          const d = (r && r.data) ? r.data : r || {}
+          const candidate = (d && (d['redirectUrl'] || d['auth_url'] || d['url']))
+            || (r && (r['redirectUrl'] || r['auth_url'] || r['url']))
+            || ''
+          return typeof candidate === 'string' ? candidate : ''
+        } catch {
+          return ''
+        }
+      }
+
+      let redirectUrl: string = extractRedirectUrl(resp)
+      if (!redirectUrl) {
         try {
           const fallback = await ApiService.getGoogleOAuthUrl()
-          redirectUrl = fallback?.data?.redirectUrl || fallback?.data?.auth_url || ''
+          redirectUrl = extractRedirectUrl(fallback)
         } catch {}
       }
-      if (!redirectUrl || typeof redirectUrl !== 'string') {
+      if (!redirectUrl) {
         throw new Error('未取得授權連結')
       }
 

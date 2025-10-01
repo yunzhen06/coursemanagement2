@@ -13,6 +13,7 @@ interface GoogleAuthProps {
   lineUserId: string
   isLoading: boolean
   isGoogleLoading?: boolean
+  isCompleted?: boolean  // 新增：註冊是否已完成
   onGoogleAuth: () => void
   onPrev: () => void
 }
@@ -24,6 +25,7 @@ export function RegistrationGoogleAuth({
   lineUserId,
   isLoading,
   isGoogleLoading = false,
+  isCompleted = false,  // 新增：預設為 false
   onGoogleAuth,
   onPrev
 }: GoogleAuthProps) {
@@ -223,6 +225,11 @@ export function RegistrationGoogleAuth({
                 <div className="flex items-center justify-center space-x-2 py-4">
                   <div className="w-5 h-5 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
                   <span className="text-green-700 font-medium">正在完成註冊...</span>
+                </div>
+              ) : isCompleted ? (
+                <div className="text-center py-2 space-y-2">
+                  <p className="text-green-700 font-medium">🎉 註冊完成！</p>
+                  <p className="text-green-600 text-sm">正在跳轉到主頁...</p>
                 </div>
               ) : (
                 <div className="text-center py-2">

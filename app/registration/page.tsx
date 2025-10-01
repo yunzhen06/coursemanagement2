@@ -99,7 +99,10 @@ export default function RegistrationPage() {
         // Google 授權成功後自動完成註冊
         const success = await completeRegistrationWithEmail(userEmail)
         if (success) {
-          // 顯示註冊完成頁面，稍後自動關閉/導向
+          // 註冊成功後自動跳轉到主頁
+          setTimeout(() => {
+            router.replace('/')
+          }, 2000) // 2秒後跳轉，讓用戶看到成功訊息
         }
       }
     } catch (error) {
@@ -111,8 +114,10 @@ export default function RegistrationPage() {
   const handleComplete = async () => {
     const success = await completeRegistration()
     if (success) {
-      // 註冊成功後保留在完成頁，提示使用 LINE Bot
-      // 不自動跳轉到主頁面
+      // 註冊成功後自動跳轉到主頁
+      setTimeout(() => {
+        router.replace('/')
+      }, 2000) // 2秒後跳轉，讓用戶看到成功訊息
     }
   }
 
@@ -448,6 +453,7 @@ export default function RegistrationPage() {
             lineUserId={data.lineUserId}
             isLoading={isLoading}
             isGoogleLoading={googleLoading}
+            isCompleted={isCompleted}
             onGoogleAuth={handleGoogleAuth}
             onPrev={prevStep}
           />
