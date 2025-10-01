@@ -36,26 +36,63 @@ export default function GoogleAuthSuccessPage() {
             setStatus('registered')
             // 已註冊用戶直接跳轉到主頁
             setTimeout(() => {
-              router.replace('/')
+              // 在 LIFF 環境中，使用 postMessage 通知父頁面
+              if (typeof window !== 'undefined' && window.opener) {
+                window.opener.postMessage({
+                  type: 'GOOGLE_AUTH_SUCCESS',
+                  email: effectiveEmail,
+                  line_user_id: effectiveId,
+                  registered: true
+                }, window.location.origin)
+                window.close()
+              } else {
+                router.replace('/')
+              }
             }, 1500)
           } else {
             setStatus('needs_registration')
-            // 未完成註冊的用戶跳轉到註冊頁
+            // 未完成註冊的用戶通知父頁面或跳轉到註冊頁
             setTimeout(() => {
-              router.replace('/registration')
+              if (typeof window !== 'undefined' && window.opener) {
+                window.opener.postMessage({
+                  type: 'GOOGLE_AUTH_SUCCESS',
+                  email: effectiveEmail,
+                  line_user_id: effectiveId,
+                  registered: false
+                }, window.location.origin)
+                window.close()
+              } else {
+                router.replace('/registration')
+              }
             }, 1500)
           }
         } catch (error) {
           console.error('檢查註冊狀態失敗:', error)
           setStatus('needs_registration')
           setTimeout(() => {
-            router.replace('/registration')
+            if (typeof window !== 'undefined' && window.opener) {
+              window.opener.postMessage({
+                type: 'GOOGLE_AUTH_ERROR',
+                error: '檢查註冊狀態失敗'
+              }, window.location.origin)
+              window.close()
+            } else {
+              router.replace('/registration')
+            }
           }, 1500)
         }
       } else {
         setStatus('needs_registration')
         setTimeout(() => {
-          router.replace('/registration')
+          if (typeof window !== 'undefined' && window.opener) {
+            window.opener.postMessage({
+              type: 'GOOGLE_AUTH_ERROR',
+              error: '缺少用戶 ID'
+            }, window.location.origin)
+            window.close()
+          } else {
+            router.replace('/registration')
+          }
         }, 1500)
       }
     }

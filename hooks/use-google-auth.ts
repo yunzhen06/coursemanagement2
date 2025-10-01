@@ -2,7 +2,14 @@
 
 import { useState, useCallback } from 'react'
 import { ApiService } from '@/services/apiService'
-import { getIdToken, openExternalUrl, parseLiffReturn } from '@/lib/line-liff'
+import { getIdToken, parseLiffReturn } from '@/lib/line-liff'
+import { 
+  openGoogleAuthInLiff, 
+  setupGoogleAuthMessageListener,
+  parseGoogleAuthCallback,
+  cleanupOAuthParams,
+  isLiffEnvironment
+} from '@/lib/liff-environment'
 import { useLineAuth } from './use-line-auth'
 
 export interface GoogleAuthState {
@@ -106,16 +113,63 @@ export function useGoogleAuth() {
         throw new Error('未取得授權連結')
       }
 
-      // 使用 LIFF external 開啟授權連結；回到 LIFF 後由 parseLiffReturn 解析
-      openExternalUrl(redirectUrl)
+      // 檢查是否已有回調數據（頁面重新載入後）
+      const callbackData = parseGoogleAuthCallback()
+      if (callbackData.hasCallback) {
+        // 清理 URL 參數
+        cleanupOAuthParams()
+        
+        // 儲存用戶數據
+        if (callbackData.lineUserId) {
+          ApiService.setLineUserId(callbackData.lineUserId)
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('lineUserId', callbackData.lineUserId)
+          }
+        }
+        
+        const userEmail = callbackData.email || 'user@gmail.com'
+        setAuthorized(true, userEmail)
+        setLoading(false)
+        return userEmail
+      }
+
+      // 使用適合的方式開啟授權連結
+      openGoogleAuthInLiff(redirectUrl)
 
       return new Promise((resolve, reject) => {
-        // 輕量輪詢：等待返回 LIFF（URL 攜帶 email/line_user_id）或後端連線已建立
+        // 設置 postMessage 監聽器
+        const cleanup = setupGoogleAuthMessageListener(
+          (data) => {
+            cleanup()
+            
+            // 儲存 line_user_id 以備之後 API 使用
+            if (data.line_user_id) {
+              ApiService.setLineUserId(data.line_user_id)
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('lineUserId', data.line_user_id)
+              }
+            }
+            
+            const userEmail = data.email || 'user@gmail.com'
+            setAuthorized(true, userEmail)
+            setLoading(false)
+            resolve(userEmail)
+          },
+          (error) => {
+            cleanup()
+            setError(error)
+            setLoading(false)
+            reject(new Error(error))
+          }
+        )
+
+        // 備用方案：輪詢檢查授權狀態
         const startedAt = Date.now()
         const poll = setInterval(async () => {
           // 超時 10 分鐘
           if (Date.now() - startedAt > 10 * 60 * 1000) {
             clearInterval(poll)
+            cleanup()
             setLoading(false)
             setError('授權超時')
             reject(new Error('授權超時'))
@@ -123,8 +177,12 @@ export function useGoogleAuth() {
           }
 
           try {
+            // 檢查 URL 參數（LIFF deep link 返回）
             const ret = parseLiffReturn()
             if ((ret.email && ret.email.includes('@')) || ret.lineUserId) {
+              clearInterval(poll)
+              cleanup()
+              
               // 儲存 line_user_id 以備之後 API 使用
               if (ret.lineUserId) {
                 ApiService.setLineUserId(ret.lineUserId)
@@ -134,18 +192,18 @@ export function useGoogleAuth() {
               }
               const userEmail = ret.email || 'user@gmail.com'
               setAuthorized(true, userEmail)
-              clearInterval(poll)
               setLoading(false)
               resolve(userEmail)
               return
             }
 
-            // 後端連線測試作為備援
+            // 後端連線測試作為最後備援
             const response = await ApiService.getGoogleApiStatus()
             if (response.data && (response.data as any).is_connected) {
+              clearInterval(poll)
+              cleanup()
               const userEmail = 'user@gmail.com'
               setAuthorized(true, userEmail)
-              clearInterval(poll)
               setLoading(false)
               resolve(userEmail)
               return
@@ -153,7 +211,7 @@ export function useGoogleAuth() {
           } catch (e) {
             // 忽略暫時性錯誤，繼續輪詢
           }
-        }, 1000)
+        }, 3000) // 降低輪詢頻率到 3 秒
       })
     } catch (error) {
       console.error('Google 授權失敗:', error)

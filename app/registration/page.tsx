@@ -90,6 +90,20 @@ export default function RegistrationPage() {
         // 同步保存 lineUserId（來自授權成功訊息或先前儲存）
         const effectiveId = ApiService.getLineUserId() || ApiService.bootstrapLineUserId()
         updateData({ googleEmail: userEmail, lineUserId: effectiveId })
+        
+        // 檢查用戶是否已經註冊（可能在授權過程中已完成）
+        try {
+          const isRegistered = await UserService.getOnboardStatus(effectiveId)
+          if (isRegistered) {
+            // 用戶已註冊，直接跳轉到主頁
+            console.log('用戶已註冊，跳轉到主頁')
+            router.replace('/')
+            return
+          }
+        } catch (error) {
+          console.error('檢查註冊狀態失敗:', error)
+        }
+        
         // Google 授權成功後自動完成註冊
         const success = await completeRegistrationWithEmail(userEmail)
         if (success) {
