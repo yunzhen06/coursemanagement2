@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { GoogleIcon, AlertTriangleIcon, CheckIcon, RefreshIcon, SettingsIcon, CalendarIcon } from "@/components/icons"
 import { ApiService } from "@/services/apiService"
-import { openExternalUrl, isInLineApp } from "@/lib/line-liff"
+import { openGoogleAuthInLiff } from "@/lib/liff-environment"
 
 interface GoogleAuthManagerProps {
   onAuthSuccess?: () => void
@@ -115,17 +115,9 @@ export function GoogleAuthManager({
         throw new Error('未取得授權連結')
       }
 
-      // 在 LIFF 環境中：使用外部瀏覽器開啟，並提示回到 LINE
-      if (isInLineApp()) {
-        openExternalUrl(redirectUrl)
-        setError('請在外部瀏覽器完成 Google 授權後返回 LINE，系統會自動切換頁面')
-        setIsLoading(false)
-        return
-      }
-
-      // 非 LIFF 環境：以新分頁開啟，不設置監聽或輪詢
-      window.open(redirectUrl, '_blank', 'noopener,noreferrer')
-      setError('已開啟授權頁面，完成後請回到本頁繼續')
+      // 統一使用共用方法處理（LIFF：外部瀏覽器；非 LIFF：整頁導向）
+      openGoogleAuthInLiff(redirectUrl)
+      setError('已導向授權頁面，完成後返回應用程式')
       setIsLoading(false)
     } catch (error) {
       console.error('Google 授權失敗:', error)

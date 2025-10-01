@@ -12,7 +12,8 @@ import { RegistrationNameInput } from '@/components/registration-name-input'
 import { RegistrationGoogleAuth } from '@/components/registration-google-auth'
 import { Card, CardContent } from '@/components/ui/card'
 import { CheckCircle, Loader2 } from 'lucide-react'
-import { closeLiffWindow } from '@/lib/line-liff'
+import { closeLiffWindow, getIdToken } from '@/lib/line-liff'
+import { isLiffEnvironment } from '@/lib/liff-environment'
 import { Button } from '@/components/ui/button'
 
 export default function RegistrationPage() {
@@ -81,41 +82,44 @@ export default function RegistrationPage() {
   // Google 授權處理
   const handleGoogleAuth = async () => {
     try {
-      // 將使用者選擇的 role 與 name 一併傳入，以便在 LIFF 環境優先使用預註冊流程
-      const userEmail = await authorizeGoogle({
-        role: data.role ?? undefined,
-        name: data.name || ''
-      })
-      if (userEmail) {
-        // 同步保存 lineUserId（來自授權成功訊息或先前儲存）
-        const effectiveId = ApiService.getLineUserId() || ApiService.bootstrapLineUserId()
-        updateData({ googleEmail: userEmail, lineUserId: effectiveId })
-        
-        // 檢查用戶是否已經註冊（可能在授權過程中已完成）
-        try {
-          const isRegistered = await UserService.getOnboardStatus(effectiveId)
-          if (isRegistered) {
-            // 用戶已註冊，直接跳轉到主頁
-            console.log('用戶已註冊，跳轉到主頁')
-            router.replace('/')
-            return
-          }
-        } catch (error) {
-          console.error('檢查註冊狀態失敗:', error)
-        }
-        
-        // Google 授權成功後自動完成註冊
-        const success = await completeRegistrationWithEmail(userEmail)
-        if (success) {
-          // 註冊成功後自動跳轉到主頁
-          setTimeout(() => {
-            router.replace('/')
-          }, 2000) // 2秒後跳轉，讓用戶看到成功訊息
-        }
+      const role = data.role ?? undefined
+      const name = data.name || ''
+      
+      // LIFF 環境優先使用預註冊，否則直接取得 OAuth 連結
+      let redirectUrl = ''
+      if (isLiffEnvironment() && lineUser?.userId && role && name) {
+        const idToken = getIdToken()
+        const resp = await ApiService.preRegister({
+          id_token: idToken || '',
+          role: role!,
+          name: name!
+        })
+        const d: any = resp?.data || resp || {}
+        redirectUrl = d.redirectUrl || d.auth_url || d.url || ''
       }
+      
+      if (!redirectUrl) {
+        const resp = await ApiService.getGoogleOAuthUrl({ role, name })
+        const d: any = resp?.data || resp || {}
+        redirectUrl = d.redirectUrl || d.auth_url || d.url || ''
+      }
+      
+      if (!redirectUrl) {
+        alert('後端未回傳 redirectUrl')
+        return
+      }
+      
+      // 在 LIFF：用外部瀏覽器開啟；非 LIFF：整頁導向
+      if (typeof window !== 'undefined' && (window as any).liff?.openWindow) {
+        (window as any).liff.openWindow({ url: redirectUrl, external: true })
+      } else {
+        window.location.href = redirectUrl
+      }
+      
+      // 進入等待授權狀態（僅提示，不做輪詢）
+      console.log('已開啟 Google 授權，請完成後返回應用程式')
     } catch (error) {
       console.error('Google 授權失敗:', error)
-      // 錯誤處理已在 useGoogleAuth 中處理
     }
   }
 

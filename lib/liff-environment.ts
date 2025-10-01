@@ -36,42 +36,12 @@ export function openGoogleAuthInLiff(authUrl: string): void {
     // 在 LIFF 環境中，使用 external: true 開啟外部瀏覽器
     openExternalUrl(authUrl)
   } else {
-    // 非 LIFF 環境，使用標準的新視窗開啟
-    window.open(authUrl, '_blank', 'noopener,noreferrer')
+    // 非 LIFF 環境，整頁導向到授權連結（不使用彈出視窗）
+    window.location.href = authUrl
   }
 }
 
-/**
- * 處理 Google OAuth 回調的 postMessage
- */
-export function setupGoogleAuthMessageListener(
-  onSuccess: (data: { email: string; line_user_id: string; registered?: boolean }) => void,
-  onError: (error: string) => void
-): () => void {
-  const handleMessage = (event: MessageEvent) => {
-    // 只接受來自同源的訊息
-    if (event.origin !== window.location.origin) {
-      return
-    }
-
-    if (event.data.type === 'GOOGLE_AUTH_SUCCESS') {
-      onSuccess({
-        email: event.data.email || '',
-        line_user_id: event.data.line_user_id || '',
-        registered: event.data.registered
-      })
-    } else if (event.data.type === 'GOOGLE_AUTH_ERROR') {
-      onError(event.data.error || '授權失敗')
-    }
-  }
-
-  window.addEventListener('message', handleMessage)
-
-  // 返回清理函數
-  return () => {
-    window.removeEventListener('message', handleMessage)
-  }
-}
+// 已移除 postMessage 監聽：改由成功頁與 deep link 參數處理
 
 /**
  * 檢查 URL 參數中是否包含 Google OAuth 回調數據
