@@ -6,6 +6,7 @@ import { BottomNavigation } from "@/components/bottom-navigation"
 import { SidebarNavigation } from "@/components/sidebar-navigation"
 import { PageHeader } from "@/components/page-header"
 import { useLineAuth } from "@/hooks/use-line-auth"
+import { useUserAuth } from "@/hooks/use-user-auth"
 import { CourseForm } from "@/components/course-form"
 import { CourseCard } from "@/components/course-card"
 import { CourseDetail } from "@/components/course-detail"
@@ -56,6 +57,9 @@ export default function HomePage() {
   const searchParams = useSearchParams()
   const router = useRouter()
   
+  // 權限檢查 - 確保用戶已註冊
+  const { isAuthenticated, needsRegistration, isLoading: authLoading } = useUserAuth()
+  
   // 從 URL 參數獲取初始標籤頁，如果沒有則默認為 "home"
   const initialTab = searchParams.get('tab') || "home"
   const [activeTab, setActiveTab] = useState(initialTab)
@@ -67,6 +71,14 @@ export default function HomePage() {
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
   const [assignmentFilter, setAssignmentFilter] = useState("all")
   
+  // 權限檢查 - 重定向未註冊用戶
+  useEffect(() => {
+    if (!authLoading && needsRegistration) {
+      console.log('用戶未註冊，重定向到註冊頁面')
+      router.replace('/registration')
+    }
+  }, [authLoading, needsRegistration, router])
+
   // 使用 LINE 認證獲取真實的 user ID
   const { user: lineUser, isLoggedIn: isLineLoggedIn, isLoading: lineLoading } = useLineAuth()
   const [lineUserId, setLineUserId] = useState<string>("")
@@ -92,8 +104,8 @@ export default function HomePage() {
           if (response.data) {
             setUser(prevUser => ({
               ...prevUser,
-              name: response.data.name || "訪客使用者",
-              email: response.data.email || "guest@example.com",
+              name: response.data.name || "",
+              email: response.data.email || "",
               isLoggedIn: true
             }))
           }
@@ -166,9 +178,9 @@ export default function HomePage() {
     avatar?: string
     isLoggedIn: boolean
   }>({
-    id: "1",
-    name: "訪客使用者",
-    email: "guest@example.com",
+    id: "",
+    name: "",
+    email: "",
     avatar: "",
     isLoggedIn: false,
   })
@@ -1384,6 +1396,18 @@ export default function HomePage() {
           >
             重新載入
           </button>
+        </div>
+      </div>
+    )
+  }
+
+  // 權限檢查載入狀態
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-gray-600">正在驗證用戶權限...</p>
         </div>
       </div>
     )

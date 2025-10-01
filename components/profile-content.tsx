@@ -46,9 +46,9 @@ interface ProfileContentProps {
 
 export function ProfileContent({ user: propUser, onUserChange }: ProfileContentProps) {
   const [user, setUser] = useState<User>({
-    id: "1",
-    name: "學生",
-    email: "student@example.com",
+    id: "",
+    name: "",
+    email: "",
     avatar: "",
     isLoggedIn: false,
   })
@@ -149,22 +149,22 @@ export function ProfileContent({ user: propUser, onUserChange }: ProfileContentP
       if (Notification.permission === "default") {
         Notification.requestPermission().then((permission) => {
           if (permission === "granted") {
-            new Notification("測試通知", {
-              body: "這是一個測試推播通知",
+            new Notification("通知測試", {
+              body: "通知功能正常運作",
               icon: "/favicon.ico",
             })
           }
         })
       } else if (Notification.permission === "granted") {
-        new Notification("測試通知", {
-          body: "這是一個測試推播通知",
+        new Notification("通知測試", {
+          body: "通知功能正常運作",
           icon: "/favicon.ico",
         })
       }
     }
 
     if (notificationSettings.lineNotifications) {
-      alert("LINE 推播測試通知已發送！")
+      alert("LINE 通知測試已發送")
     }
 
     if (!notificationSettings.browserNotifications && !notificationSettings.lineNotifications) {

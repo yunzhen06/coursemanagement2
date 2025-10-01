@@ -30,72 +30,7 @@ export function CompactMonthlyCalendar({ className, selectedDate, onDateSelect, 
   const [currentDate, setCurrentDate] = useState(getTaiwanTime())
   // const [googleEvents, setGoogleEvents] = useState<CalendarEvent[]>([])
 
-  const defaultEvents: CalendarEvent[] = [
-    {
-      id: "1",
-      title: "數學作業",
-      date: new Date(2024, 11, 15), // December 15, 2024
-      time: "09:00", // Added time for each event
-      type: "assignment",
-      color: "bg-blue-500",
-    },
-    {
-      id: "2",
-      title: "英文考試",
-      date: new Date(2024, 11, 20), // December 20, 2024
-      time: "14:00",
-      type: "exam",
-      color: "bg-red-500",
-    },
-    {
-      id: "3",
-      title: "物理課程",
-      date: new Date(2024, 11, 18), // December 18, 2024
-      time: "10:30",
-      type: "course",
-      color: "bg-green-500",
-    },
-    {
-      id: "4",
-      title: "化學筆記",
-      date: new Date(2024, 11, 22), // December 22, 2024
-      time: "16:00",
-      type: "note",
-      color: "bg-yellow-500",
-    },
-    {
-      id: "5",
-      title: "歷史報告",
-      date: new Date(2024, 11, 25), // December 25, 2024
-      time: "11:00",
-      type: "assignment",
-      color: "bg-blue-500",
-    },
-    {
-      id: "6",
-      title: "生物實驗",
-      date: new Date(2024, 11, 28), // December 28, 2024
-      time: "13:30",
-      type: "course",
-      color: "bg-green-500",
-    },
-    {
-      id: "7",
-      title: "英文作業",
-      date: new Date(2024, 11, 15), // December 15, 2024 - same day as math
-      time: "15:30",
-      type: "assignment",
-      color: "bg-blue-500",
-    },
-    {
-      id: "8",
-      title: "科學筆記整理",
-      date: new Date(2024, 11, 15), // December 15, 2024 - same day
-      time: "19:00",
-      type: "note",
-      color: "bg-yellow-500",
-    },
-  ]
+  const defaultEvents: CalendarEvent[] = []
 
   useEffect(() => {
     if (selectedDate) {
