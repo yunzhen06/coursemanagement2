@@ -3,7 +3,7 @@
  * 專門處理 LINE LIFF 環境中的特殊需求
  */
 
-import { isInLineApp, openExternalUrl } from './line-liff'
+import { isInLineApp, openExternalUrl, initializeLiff } from './line-liff'
 
 /**
  * 檢測當前是否在 LIFF 環境中
@@ -27,16 +27,81 @@ export function isMobileDevice(): boolean {
   )
 }
 
+// 檢測是否在 LINE 內建瀏覽器（非 LIFF 容器）
+export function isLineInAppBrowser(): boolean {
+  try {
+    if (typeof navigator === 'undefined') return false
+    const ua = navigator.userAgent || ''
+    // LINE 內建瀏覽器 UA 通常包含 "Line/"
+    return /Line\//i.test(ua)
+  } catch {
+    return false
+  }
+}
+
 /**
  * 在 LIFF 環境中開啟外部 URL（Google OAuth）
  * 會自動選擇最適合的開啟方式
  */
 export function openGoogleAuthInLiff(authUrl: string): void {
-  if (isLiffEnvironment()) {
-    // 在 LIFF 環境中，使用 external: true 開啟外部瀏覽器
-    openExternalUrl(authUrl)
-  } else {
-    // 非 LIFF 環境，使用標準的新視窗開啟
+  try {
+    // 在 LIFF 容器中：初始化後使用 openWindow external
+    if (isLiffEnvironment()) {
+      const initPromise = initializeLiff()
+      initPromise
+        .then(() => {
+          openExternalUrl(authUrl)
+        })
+        .catch(() => {
+          // 初始化失敗仍嘗試以外部方式開啟
+          openExternalUrl(authUrl)
+        })
+      return
+    }
+
+    // 非 LIFF，但在 LINE 內建瀏覽器：直接使用平台特定方式開啟外部瀏覽器
+    if (isLineInAppBrowser()) {
+      try {
+        if (typeof navigator !== 'undefined') {
+          const ua = navigator.userAgent || ''
+          const isAndroid = /Android/i.test(ua)
+          const isIOS = /iPhone|iPad|iPod/i.test(ua)
+
+          if (isAndroid) {
+            // 以 Chrome intent 方式開啟
+            const stripped = authUrl.replace(/^https?:\/\//, '')
+            const intentUrl = `intent://${stripped}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(authUrl)};end`
+            window.location.href = intentUrl
+            return
+          }
+
+          if (isIOS) {
+            // 嘗試以 Chrome scheme 開啟；未安裝 Chrome 會失敗，瀏覽器會停留
+            const chromeUrl = authUrl.startsWith('https://')
+              ? authUrl.replace('https://', 'googlechromes://')
+              : authUrl.replace('http://', 'googlechrome://')
+            window.location.href = chromeUrl
+            // 若失敗，稍後使用一般新分頁（依舊可能留在內嵌，但無 LIFF）
+            setTimeout(() => {
+              try {
+                window.open(authUrl, '_blank', 'noopener,noreferrer')
+              } catch {}
+            }, 800)
+            return
+          }
+        }
+      } catch (e) {
+        console.warn('直接開啟外部瀏覽器失敗，回退新分頁:', e)
+      }
+      // 其他平台或失敗：一般新分頁
+      window.open(authUrl, '_blank', 'noopener,noreferrer')
+      return
+    }
+
+    // 非 LINE 內建瀏覽器：一般新分頁
+    window.open(authUrl, '_blank', 'noopener,noreferrer')
+  } catch {
+    // 最終備援：非 LIFF 環境使用一般新視窗
     window.open(authUrl, '_blank', 'noopener,noreferrer')
   }
 }

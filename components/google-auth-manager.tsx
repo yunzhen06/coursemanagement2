@@ -116,22 +116,11 @@ export function GoogleAuthManager({
         throw new Error('未取得授權連結')
       }
 
-      // ① 先初始化 LIFF，確保 API 可用
-      const inited = await initializeLiff()
-      const env = getLineEnvironment()
-      const canUseOpenWindow = inited && env.isInClient && env.isApiAvailable('openWindow')
-
-      // ② 在 LINE 內且 openWindow 可用 → 使用外部瀏覽器；否則回退到 window.open
-      if (canUseOpenWindow) {
-        try {
-          openGoogleAuthInLiff(redirectUrl)
-          setError('請在外部瀏覽器完成 Google 授權後，返回 LINE 重新整理頁面')
-          setIsLoading(false)
-          return
-        } catch (liffError) {
-          console.error('LIFF openWindow 失敗，改用一般視窗:', liffError)
-        }
-      }
+      // 直接交由共用工具決定最佳開啟方式（在 LINE 內建瀏覽器避免先開 LIFF）
+      openGoogleAuthInLiff(redirectUrl)
+      setError('請在外部瀏覽器完成 Google 授權後，返回 LINE 重新整理頁面')
+      setIsLoading(false)
+      return
 
       // 在普通瀏覽器環境中打開新視窗
       const authWindow = window.open(
@@ -150,7 +139,9 @@ export function GoogleAuthManager({
         
         if (event.data.type === 'google-auth-success') {
           window.removeEventListener('message', handleMessage)
-          authWindow.close()
+          if (authWindow && !authWindow.closed) {
+            authWindow.close()
+          }
           // 儲存 line_user_id 以利後續 API 調用
           try {
             const incomingId = (event.data as any)?.line_user_id
@@ -165,7 +156,9 @@ export function GoogleAuthManager({
           onAuthSuccess?.()
         } else if (event.data.type === 'google-auth-error') {
           window.removeEventListener('message', handleMessage)
-          authWindow.close()
+          if (authWindow && !authWindow.closed) {
+            authWindow.close()
+          }
           setError(event.data.error || '授權失敗')
           onAuthError?.(event.data.error || '授權失敗')
         }
