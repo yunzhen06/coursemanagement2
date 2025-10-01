@@ -20,6 +20,7 @@ export default function GoogleAuthSuccessPage() {
       const fromLiff = parseLiffReturn()
       const effectiveEmail = email || fromLiff.email || ''
       const effectiveId = lineUserId || fromLiff.lineUserId || ''
+      const redirectHint = fromLiff.redirect || ''
 
       try {
         if (effectiveId) {
@@ -27,6 +28,15 @@ export default function GoogleAuthSuccessPage() {
           ApiService.setLineUserId(effectiveId)
         }
       } catch {}
+
+      // 若後端標示回到首頁（redirect=/），直接導回首頁，不進入註冊頁邏輯
+      if (redirectHint === '/') {
+        setStatus('registered')
+        setTimeout(() => {
+          router.replace('/')
+        }, 800)
+        return
+      }
 
       // 檢查用戶是否已完成註冊
       if (effectiveId) {
