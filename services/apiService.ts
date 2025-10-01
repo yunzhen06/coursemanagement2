@@ -736,15 +736,7 @@ export class ApiService {
     })
   }
 
-  static async testGoogleConnection() {
-    if (!this.lineUserId) {
-      this.bootstrapLineUserId()
-    }
-    return this.request('/sync/test-connection/', {
-      method: 'POST',
-      body: JSON.stringify({ line_user_id: this.lineUserId })
-    })
-  }
+
 
   static async triggerAutoSync() {
     if (!this.lineUserId) {
@@ -767,7 +759,7 @@ export class ApiService {
   }
 
   // Google OAuth 相關 API
-  static async getGoogleOAuthUrl() {
+  static async getGoogleOAuthUrl(userData?: { role?: 'teacher' | 'student'; name?: string }) {
     if (!this.lineUserId) {
       this.bootstrapLineUserId()
     }
@@ -776,9 +768,18 @@ export class ApiService {
       try { await fetchCsrfToken('') } catch {}
     }
     
+    // 構建請求體，包含用戶數據（如果提供的話）
+    const requestBody: any = { line_user_id: this.lineUserId }
+    if (userData?.role) {
+      requestBody.role = userData.role
+    }
+    if (userData?.name) {
+      requestBody.name = userData.name
+    }
+    
     return this.request<{ auth_url: string }>('/google/url/', {
       method: 'POST',
-      body: JSON.stringify({ line_user_id: this.lineUserId }),
+      body: JSON.stringify(requestBody),
     }, 'oauth')
   }
 

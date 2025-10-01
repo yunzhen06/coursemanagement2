@@ -104,23 +104,7 @@ export function GoogleClassroomSync({ onSync }: GoogleClassroomSyncProps) {
     }
   }
 
-  const handleTestConnection = async () => {
-    try {
-      const response = await ApiService.testGoogleConnection()
-      if (response.data) {
-        const data = response.data as any
-        setIsConnected(data.is_connected || false)
-        if (data.error_message) {
-          setErrorMessage(data.error_message)
-        } else {
-          setErrorMessage(null)
-        }
-      }
-    } catch (error) {
-      console.error('測試 Google 連接失敗:', error)
-      setErrorMessage('連接測試失敗')
-    }
-  }
+
 
   return (
     <Card className="p-4 sm:p-6">
@@ -142,15 +126,6 @@ export function GoogleClassroomSync({ onSync }: GoogleClassroomSyncProps) {
           </div>
 
           <div className="flex gap-2">
-            <Button 
-              onClick={handleTestConnection} 
-              variant="outline" 
-              size="sm"
-              className="gap-2"
-            >
-              <SettingsIcon className="w-4 h-4" />
-              測試連接
-            </Button>
             <Button 
               onClick={handleSync} 
               disabled={isLoading || !isConnected} 

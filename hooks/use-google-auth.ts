@@ -63,22 +63,22 @@ export function useGoogleAuth() {
               name: payload!.name!,
             })
           } catch (e) {
-            // 預註冊失敗時，改用直接 OAuth
-            resp = await ApiService.getGoogleOAuthUrl()
+            // 預註冊失敗時，改用直接 OAuth，但仍傳遞用戶數據
+            resp = await ApiService.getGoogleOAuthUrl(payload)
           }
         } else {
-          // 取不到 id_token 時退回直接 OAuth
-          resp = await ApiService.getGoogleOAuthUrl()
+          // 取不到 id_token 時退回直接 OAuth，但仍傳遞用戶數據
+          resp = await ApiService.getGoogleOAuthUrl(payload)
         }
       } else {
         // 2) 其他情況（非 LIFF 或沒有 role/name），走直接 OAuth（csrf_exempt）
-        resp = await ApiService.getGoogleOAuthUrl()
+        resp = await ApiService.getGoogleOAuthUrl(payload)
       }
 
       // 若預註冊返回錯誤或未取得連結，嘗試再取一次直接 OAuth 連結
       if (resp?.error) {
         try {
-          resp = await ApiService.getGoogleOAuthUrl()
+          resp = await ApiService.getGoogleOAuthUrl(payload)
         } catch {}
       }
 
@@ -141,7 +141,7 @@ export function useGoogleAuth() {
             }
 
             // 後端連線測試作為備援
-            const response = await ApiService.testGoogleConnection()
+            const response = await ApiService.getGoogleApiStatus()
             if (response.data && (response.data as any).is_connected) {
               const userEmail = 'user@gmail.com'
               setAuthorized(true, userEmail)
@@ -165,7 +165,7 @@ export function useGoogleAuth() {
 
   const checkAuthStatus = useCallback(async () => {
     try {
-      const response = await ApiService.testGoogleConnection()
+      const response = await ApiService.getGoogleApiStatus()
       if (response.data && (response.data as any).is_connected) {
         setAuthorized(true, 'user@gmail.com') // 模擬 email
         return true

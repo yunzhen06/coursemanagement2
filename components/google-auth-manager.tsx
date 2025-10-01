@@ -42,16 +42,16 @@ export function GoogleAuthManager({
       setIsLoading(true)
       setError(null)
 
-      // 測試 Google Classroom 連接
+      // 檢查 Google API 狀態
       let classroomConnected = false
       let calendarConnected = false
 
       if (showClassroomSync) {
         try {
-          const classroomResponse = await ApiService.testGoogleConnection()
-          classroomConnected = classroomResponse.data?.is_connected || false
+          const classroomResponse = await ApiService.getGoogleApiStatus()
+          classroomConnected = (classroomResponse.data as any)?.is_connected || false
         } catch (error) {
-          console.error('Classroom 連接測試失敗:', error)
+          console.error('Classroom 狀態檢查失敗:', error)
         }
       }
 
@@ -114,7 +114,28 @@ export function GoogleAuthManager({
         throw new Error('未取得授權連結')
       }
 
-      // 在新視窗中打開 Google 授權頁面
+      // 檢查是否在 LINE LIFF 環境中
+      const isInLiff = typeof window !== 'undefined' && (window as any).liff
+      
+      if (isInLiff) {
+        // 在 LIFF 環境中，使用 liff.openWindow 打開外部瀏覽器
+        try {
+          (window as any).liff.openWindow({
+            url: redirectUrl,
+            external: true
+          })
+          
+          // 在 LIFF 環境中，我們無法監聽授權完成，所以顯示提示訊息
+          setError('請在外部瀏覽器完成 Google 授權後，返回 LINE 重新整理頁面')
+          setIsLoading(false)
+          return
+        } catch (liffError) {
+          console.error('LIFF openWindow 失敗:', liffError)
+          // 如果 LIFF 失敗，回退到普通的 window.open
+        }
+      }
+
+      // 在普通瀏覽器環境中打開新視窗
       const authWindow = window.open(
         redirectUrl,
         'google-auth',
