@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import { BottomNavigation } from "@/components/bottom-navigation"
 import { SidebarNavigation } from "@/components/sidebar-navigation"
 import { PageHeader } from "@/components/page-header"
@@ -52,7 +53,12 @@ import LiveDashboardStats, { DashboardStats } from "@/components/dashboard-stats
 
 
 export default function HomePage() {
-  const [activeTab, setActiveTab] = useState("home")
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  
+  // 從 URL 參數獲取初始標籤頁，如果沒有則默認為 "home"
+  const initialTab = searchParams.get('tab') || "home"
+  const [activeTab, setActiveTab] = useState(initialTab)
   const [showCourseForm, setShowCourseForm] = useState(false)
   const [editingCourse, setEditingCourse] = useState<string | null>(null)
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null)
@@ -99,6 +105,32 @@ export default function HomePage() {
       fetchUserProfile()
     }
   }, [lineUserId])
+
+  // 監聽 URL 參數變化
+  useEffect(() => {
+    const tabParam = searchParams.get('tab')
+    if (tabParam && tabParam !== activeTab) {
+      setActiveTab(tabParam)
+    }
+  }, [searchParams, activeTab])
+
+  // 更新 URL 參數的函數
+  const updateTabInUrl = (tab: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (tab === "home") {
+      params.delete('tab') // 首頁不需要參數
+    } else {
+      params.set('tab', tab)
+    }
+    const newUrl = params.toString() ? `?${params.toString()}` : '/'
+    router.replace(newUrl, { scroll: false })
+  }
+
+  // 標籤頁切換函數
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab)
+    updateTabInUrl(tab)
+  }
 
   const [showNoteForm, setShowNoteForm] = useState(false)
   const [editingNote, setEditingNote] = useState<string | null>(null)
@@ -646,10 +678,10 @@ export default function HomePage() {
                       setTaskType(item.category)
                     }
                   }
-                  setActiveTab("tasks")
+                  handleTabChange("tasks")
                 }}
                 onViewAllTodos={() => {
-                  setActiveTab("tasks")
+                  handleTabChange("tasks")
                 }}
                 onAssignmentStatusChange={updateAssignment}
                 onExamStatusChange={updateExam}
@@ -749,22 +781,22 @@ export default function HomePage() {
                 lineUserId={lineUserId} 
                 showBackButton={false}
                 onOpenAssignment={(id) => {
-                  setActiveTab("tasks")
+                  handleTabChange("tasks")
                   setSelectedAssignmentId(id)
                 }}
                 onOpenExam={(id) => {
-                  setActiveTab("tasks")
+                  handleTabChange("tasks")
                   setSelectedExamId(id)
                 }}
                 onOpenNote={(id) => {
-                  setActiveTab("notes")
+                  handleTabChange("notes")
                   setSelectedNoteId(id)
                 }}
                 onOpenCustomTodo={(id) => {
                   const item = getCustomCategoryItemById(id)
                   if (item) setTaskType(item.category)
                   setSelectedCustomCategoryId(id)
-                  setActiveTab("tasks")
+                  handleTabChange("tasks")
                 }}
                 onDeleted={() => {
                   setSelectedCourseId(null)
@@ -1359,7 +1391,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <SidebarNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+      <SidebarNavigation activeTab={activeTab} onTabChange={handleTabChange} />
       <div className="lg:ml-[var(--sidebar-width)] transition-[margin] duration-300">
         <div className="mx-auto w-full px-3 sm:px-4 py-4 sm:py-6 pb-20 sm:pb-24 lg:px-6 xl:px-8 2xl:px-10 lg:py-10 lg:pb-10">{renderContent()}</div>
       </div>
@@ -1368,7 +1400,7 @@ export default function HomePage() {
         <BottomNavigation
           activeTab={activeTab}
           onTabChange={(tab) => {
-            setActiveTab(tab)
+            handleTabChange(tab)
             if (tab === "home") {
               setSelectedDate(getTaiwanTime())
             }
@@ -1379,20 +1411,20 @@ export default function HomePage() {
       <div>
         <FloatingActionButton
           onAddCourse={() => {
-            setActiveTab("courses")
+            handleTabChange("courses")
             setShowCourseForm(true)
           }}
           onAddAssignment={() => {
-            setActiveTab("tasks")
+            handleTabChange("tasks")
             setTaskType("assignment")
             setShowAssignmentForm(true)
           }}
           onAddNote={() => {
-            setActiveTab("notes")
+            handleTabChange("notes")
             setShowNoteForm(true)
           }}
           onAddExam={() => {
-            setActiveTab("tasks")
+            handleTabChange("tasks")
             setTaskType("exam")
             setShowExamForm(true)
           }}

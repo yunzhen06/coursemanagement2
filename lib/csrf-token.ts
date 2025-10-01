@@ -55,3 +55,4 @@ export async function fetchCsrfToken(baseUrl: string): Promise<string | null> {
   
   return null
 }
+
