@@ -15,7 +15,6 @@ import { CheckCircle, Loader2 } from 'lucide-react'
 import { closeLiffWindow, getIdToken } from '@/lib/line-liff'
 import { isLiffEnvironment } from '@/lib/liff-environment'
 import { Button } from '@/components/ui/button'
-import { clearAllClientStorage } from '@/lib/client-storage'
 
 export default function RegistrationPage() {
   const router = useRouter()
@@ -62,9 +61,6 @@ export default function RegistrationPage() {
         // 確保後續 API 請求帶入正確的 LINE 使用者 ID
         try { ApiService.setLineUserId(uidMemo) } catch {}
 
-        // 先清除前端儲存避免殘留造成錯誤導向
-        try { await clearAllClientStorage() } catch {}
-
         const registered = await UserService.getOnboardStatus(uidMemo)
 
         if (registered) {
@@ -72,15 +68,11 @@ export default function RegistrationPage() {
           // 在 LIFF 內直接關閉視窗；一般瀏覽器導回首頁
           try {
             if (isLiffEnvironment()) {
-              // 清除後導向，避免回到註冊頁
-              try { await clearAllClientStorage() } catch {}
               closeLiffWindow()
             } else {
-              try { await clearAllClientStorage() } catch {}
               router.replace('/')
             }
           } catch {
-            try { await clearAllClientStorage() } catch {}
             router.replace('/')
           }
           return
@@ -146,17 +138,14 @@ export default function RegistrationPage() {
     const success = await completeRegistration()
     if (success) {
       // 註冊成功後：LIFF 內關閉視窗；一般瀏覽器 2 秒後導回首頁
-      setTimeout(async () => {
+      setTimeout(() => {
         try {
           if (isLiffEnvironment()) {
-            try { await clearAllClientStorage() } catch {}
             closeLiffWindow()
           } else {
-            try { await clearAllClientStorage() } catch {}
             router.replace('/')
           }
         } catch {
-          try { await clearAllClientStorage() } catch {}
           router.replace('/')
         }
       }, 2000)

@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { parseLiffReturn } from '@/lib/line-liff'
-import { clearAllClientStorage } from '@/lib/client-storage'
 import { UserService } from '@/services/userService'
 import { ApiService } from '@/services/apiService'
 
@@ -29,9 +28,6 @@ export default function GoogleAuthSuccessPage() {
           ApiService.setLineUserId(effectiveId)
         }
       } catch {}
-
-      // 先清除所有前端儲存，避免電腦已註冊而手機殘留舊資料導致誤判
-      try { await clearAllClientStorage() } catch {}
 
       // 若後端標示回到首頁（redirect=/），直接導回首頁，不進入註冊頁邏輯
       if (redirectHint === '/') {
