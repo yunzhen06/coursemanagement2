@@ -68,9 +68,19 @@ export class ApiService {
     return this.lineUserId
   }
 
-  // 不再讀寫 localStorage；僅回傳記憶體中的 lineUserId（若不存在則空字串）
+  // 不再產生訪客 ID；僅從現有狀態或儲存中取得（若不存在則回傳空字串）
   static bootstrapLineUserId(): string {
-    return this.lineUserId || ''
+    if (typeof window === 'undefined') return this.lineUserId || ''
+    try {
+      const KEY = 'lineUserId'
+      const id = localStorage.getItem(KEY) || ''
+      if (id) {
+        this.setLineUserId(id)
+      }
+      return id
+    } catch {
+      return this.lineUserId || ''
+    }
   }
 
   private static async request<T>(

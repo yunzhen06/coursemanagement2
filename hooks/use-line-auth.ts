@@ -48,30 +48,46 @@ export const useLineAuth = () => {
   useEffect(() => {
     const initLiff = async () => {
       try {
-        // 全域清除前端 localStorage（一次性於此 hook 啟動時執行）
-        try {
-          if (typeof window !== 'undefined') {
-            localStorage.clear()
-          }
-        } catch {}
-
-        // 在本地或未設定 LIFF ID 時，直接跳過；不再使用 localStorage 生成或保存假 userId
+        // 在本地或未設定 LIFF ID 時，直接跳過並設定假 userId
         if (shouldSkipLiffLocal) {
+          const KEY = 'lineUserId'
+          let dummyId = ''
+          if (typeof window !== 'undefined') {
+            dummyId = localStorage.getItem(KEY) || `guest-local-${Math.random().toString(36).slice(2, 8)}-${Date.now()}`
+            localStorage.setItem(KEY, dummyId)
+          } else {
+            dummyId = `guest-local-${Date.now()}`
+          }
+          ApiService.setLineUserId(dummyId)
+
           setState({
             isInitialized: true,
             isInLineApp: false,
             isLoggedIn: false,
-            user: null,
+            user: { userId: dummyId, displayName: 'Local Guest' },
             isLoading: false,
             error: null
           })
-          console.log('✅ 本地模式：已跳過 LIFF')
+          console.log('✅ 本地模式：已跳過 LIFF 並使用假 userId', dummyId)
           return
         }
 
         console.log('🔄 useLineAuth: 設置 loading 狀態')
         setState(prev => ({ ...prev, isLoading: true, error: null }))
-        // 不再讀寫 localStorage，直接由 LIFF 登入同步真實 lineUserId
+        // 非本地跳過時，若存在假 lineUserId 則清除
+        try {
+          if (!shouldSkipLiffLocal && typeof window !== 'undefined') {
+            const KEY = 'lineUserId'
+            const existing = localStorage.getItem(KEY)
+            if (existing && existing.startsWith('guest-local-')) {
+              localStorage.removeItem(KEY)
+              ApiService.setLineUserId('')
+              console.log('🧹 已清除本地假 lineUserId')
+            }
+          }
+        } catch (e) {
+          console.warn('清除假 lineUserId 時發生警告', e)
+        }
         
         console.log('🚀 useLineAuth: 調用 initializeLiff')
         const initialized = await initializeLiff()
@@ -131,9 +147,16 @@ export const useLineAuth = () => {
             console.log('👤 useLineAuth: 獲取用戶資料')
             user = await getUserProfile()
             console.log('👤 useLineAuth: 用戶資料:', user)
-            // 登入後同步真實 lineUserId 至 ApiService（不使用 localStorage）
-            if (user?.userId) {
-              ApiService.setLineUserId(user.userId)
+            // 登入後同步真實 lineUserId 至 ApiService 與 localStorage
+            try {
+              if (user?.userId) {
+                ApiService.setLineUserId(user.userId)
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('lineUserId', user.userId)
+                }
+              }
+            } catch (e) {
+              console.warn('同步真實 lineUserId 時發生警告', e)
             }
           }
           

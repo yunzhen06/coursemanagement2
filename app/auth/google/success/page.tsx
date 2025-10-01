@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { parseLiffReturn } from '@/lib/line-liff'
+import { clearAllClientStorage } from '@/lib/client-storage'
 import { UserService } from '@/services/userService'
 import { ApiService } from '@/services/apiService'
 
@@ -22,10 +23,15 @@ export default function GoogleAuthSuccessPage() {
       const effectiveId = lineUserId || fromLiff.lineUserId || ''
       const redirectHint = fromLiff.redirect || ''
 
-      // 僅設定記憶體中的 lineUserId，不寫入 localStorage
-      if (effectiveId) {
-        ApiService.setLineUserId(effectiveId)
-      }
+      try {
+        if (effectiveId) {
+          localStorage.setItem('lineUserId', effectiveId)
+          ApiService.setLineUserId(effectiveId)
+        }
+      } catch {}
+
+      // 先清除所有前端儲存，避免電腦已註冊而手機殘留舊資料導致誤判
+      try { await clearAllClientStorage() } catch {}
 
       // 若後端標示回到首頁（redirect=/），直接導回首頁，不進入註冊頁邏輯
       if (redirectHint === '/') {
