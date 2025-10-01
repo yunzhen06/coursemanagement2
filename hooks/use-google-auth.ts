@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { ApiService } from '@/services/apiService'
-import { getIdToken } from '@/lib/line-liff'
+import { getIdToken, openExternalUrl, parseLiffReturn } from '@/lib/line-liff'
 import { useLineAuth } from './use-line-auth'
 
 export interface GoogleAuthState {
@@ -79,89 +79,54 @@ export function useGoogleAuth() {
         throw new Error('未取得授權連結')
       }
 
-      // 使用新標籤頁而不是彈出窗口來避免 disallowed_useragent 錯誤
-      const authWindow = window.open(redirectUrl, '_blank', 'noopener,noreferrer')
-
-      if (!authWindow) {
-        throw new Error('無法打開授權頁面，請允許瀏覽器開啟新標籤頁')
-      }
-
-      authWindow.focus()
+      // 使用 LIFF external 開啟授權連結；回到 LIFF 後由 parseLiffReturn 解析
+      openExternalUrl(redirectUrl)
 
       return new Promise((resolve, reject) => {
-        // 監聽來自授權頁面的 postMessage
-        const handleMessage = (event: MessageEvent) => {
-          if (event.origin !== window.location.origin) {
+        // 輕量輪詢：等待返回 LIFF（URL 攜帶 email/line_user_id）或後端連線已建立
+        const startedAt = Date.now()
+        const poll = setInterval(async () => {
+          // 超時 10 分鐘
+          if (Date.now() - startedAt > 10 * 60 * 1000) {
+            clearInterval(poll)
+            setLoading(false)
+            setError('授權超時')
+            reject(new Error('授權超時'))
             return
           }
 
-          if (event.data.type === 'GOOGLE_AUTH_SUCCESS') {
-            window.removeEventListener('message', handleMessage)
-            authWindow?.close()
-            // 儲存從成功頁回傳的 line_user_id，避免非 LIFF 環境下缺少 ID
-            try {
-              const incomingId = (event.data as any)?.line_user_id
-              if (typeof incomingId === 'string' && incomingId.trim()) {
-                ApiService.setLineUserId(incomingId)
+          try {
+            const ret = parseLiffReturn()
+            if ((ret.email && ret.email.includes('@')) || ret.lineUserId) {
+              // 儲存 line_user_id 以備之後 API 使用
+              if (ret.lineUserId) {
+                ApiService.setLineUserId(ret.lineUserId)
                 if (typeof window !== 'undefined') {
-                  localStorage.setItem('lineUserId', incomingId)
+                  localStorage.setItem('lineUserId', ret.lineUserId)
                 }
               }
-            } catch {}
-            const userEmail = event.data.email || 'user@gmail.com'
-            setAuthorized(true, userEmail)
-            setLoading(false)
-            resolve(userEmail)
-          } else if (event.data.type === 'GOOGLE_AUTH_ERROR') {
-            window.removeEventListener('message', handleMessage)
-            authWindow?.close()
-            setError('授權失敗')
-            setLoading(false)
-            reject(new Error('授權失敗'))
-          }
-        }
-
-        window.addEventListener('message', handleMessage)
-
-        // 備用方案：定期檢查視窗是否關閉
-        const checkWindowClosed = setInterval(() => {
-          try {
-            if (authWindow?.closed) {
-              clearInterval(checkWindowClosed)
-              window.removeEventListener('message', handleMessage)
-              setTimeout(async () => {
-                try {
-                  const response = await ApiService.testGoogleConnection()
-                  if (response.data && (response.data as any).is_connected) {
-                    const userEmail = 'user@gmail.com'
-                    setAuthorized(true, userEmail)
-                    resolve(userEmail)
-                  } else {
-                    setError('授權未完成或失敗')
-                    reject(new Error('授權未完成或失敗'))
-                  }
-                } catch (error) {
-                  setError('檢查授權狀態失敗')
-                  reject(new Error('檢查授權狀態失敗'))
-                }
-                setLoading(false)
-              }, 1000)
+              const userEmail = ret.email || 'user@gmail.com'
+              setAuthorized(true, userEmail)
+              clearInterval(poll)
+              setLoading(false)
+              resolve(userEmail)
+              return
             }
-          } catch (error) {
-            console.warn('無法檢查視窗狀態 (CORS):', error)
+
+            // 後端連線測試作為備援
+            const response = await ApiService.testGoogleConnection()
+            if (response.data && (response.data as any).is_connected) {
+              const userEmail = 'user@gmail.com'
+              setAuthorized(true, userEmail)
+              clearInterval(poll)
+              setLoading(false)
+              resolve(userEmail)
+              return
+            }
+          } catch (e) {
+            // 忽略暫時性錯誤，繼續輪詢
           }
         }, 1000)
-
-        // 10分鐘後自動停止檢查
-        setTimeout(() => {
-          clearInterval(checkWindowClosed)
-          window.removeEventListener('message', handleMessage)
-          if (authWindow && !authWindow.closed) {
-            authWindow.close()
-          }
-          setLoading(false)
-          reject(new Error('授權超時'))
-        }, 600000)
       })
     } catch (error) {
       console.error('Google 授權失敗:', error)

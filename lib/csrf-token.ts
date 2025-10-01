@@ -39,23 +39,15 @@ export function createCsrfHeaders(): Record<string, string> {
  * 發送 GET 請求來取得 CSRF token
  * 這通常在需要確保 CSRF token 存在時呼叫
  */
-export async function fetchCsrfToken(csrfUrl: string): Promise<string | null> {
+export async function fetchCsrfToken(baseUrl: string): Promise<string | null> {
   try {
-    // 如果沒有提供 URL，使用預設路徑
-    const url = csrfUrl || '/api/csrf/'
-    
-    const response = await fetch(url, {
+    const response = await fetch(`${baseUrl}/api/csrf/`, {
       method: 'GET',
       credentials: 'include', // 確保 cookies 被包含
-      headers: {
-        'ngrok-skip-browser-warning': 'true' // 避免 ngrok 警告頁面
-      }
     })
     
     if (response.ok) {
       return getCsrfToken()
-    } else {
-      console.warn(`CSRF token 請求失敗: ${response.status} ${response.statusText}`)
     }
   } catch (error) {
     console.warn('無法取得 CSRF token:', error)

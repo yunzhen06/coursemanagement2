@@ -255,3 +255,34 @@ export const validateLiffConfig = () => {
     config: LIFF_CONFIG
   }
 }
+
+// 透過 LIFF 在外部瀏覽器開啟 URL（mobile 外部、PC 新分頁）
+export const openExternalUrl = (url: string) => {
+  try {
+    if (shouldSkipLiff) {
+      window.open(url, '_blank', 'noopener,noreferrer')
+      return
+    }
+    if (liff.isInClient() && liff.isApiAvailable('openWindow')) {
+      liff.openWindow({ url, external: true })
+    } else {
+      window.open(url, '_blank', 'noopener,noreferrer')
+    }
+  } catch (e) {
+    console.error('開啟外部網址失敗:', e)
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+}
+
+// 解析 LIFF 深連結返回參數，支援 callback 攜帶 email 與 line_user_id
+export const parseLiffReturn = () => {
+  try {
+    const url = new URL(typeof window !== 'undefined' ? window.location.href : '')
+    const email = url.searchParams.get('email') || ''
+    const lineUserId = url.searchParams.get('line_user_id') || ''
+    const redirect = url.searchParams.get('redirect') || ''
+    return { email, lineUserId, redirect }
+  } catch {
+    return { email: '', lineUserId: '', redirect: '' }
+  }
+}

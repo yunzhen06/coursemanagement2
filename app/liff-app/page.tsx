@@ -6,11 +6,26 @@ import { Button } from '@/components/ui/button'
 import { useLineAuth } from '@/hooks/use-line-auth'
 import { useRouter } from 'next/navigation'
 import { Smartphone, LogOut, Share2, XCircle } from 'lucide-react'
-import { closeLiffWindow, shareToLine } from '@/lib/line-liff'
+import { closeLiffWindow, shareToLine, parseLiffReturn } from '@/lib/line-liff'
+import { useEffect } from 'react'
 
 export default function LiffAppPage() {
   const { isInitialized, isInLineApp, isLoggedIn, user } = useLineAuth()
   const router = useRouter()
+
+  // 若透過 LIFF 深連結帶有 redirect/email/line_user_id，優先導向目標頁
+  useEffect(() => {
+    try {
+      const ret = parseLiffReturn()
+      if (ret.redirect) {
+        const params = new URLSearchParams()
+        if (ret.email) params.set('email', ret.email)
+        if (ret.lineUserId) params.set('line_user_id', ret.lineUserId)
+        const query = params.toString()
+        router.replace(`${ret.redirect}${query ? `?${query}` : ''}`)
+      }
+    } catch {}
+  }, [router])
 
   return (
     <LineLayout>
@@ -44,7 +59,10 @@ export default function LiffAppPage() {
                 <Button 
                   variant="outline" 
                   className="w-full"
-                  onClick={() => shareToLine({ text: '一起使用課程管理 LIFF 應用！' })}
+                  onClick={() => shareToLine(
+                    typeof window !== 'undefined' ? window.location.href : '',
+                    '一起使用課程管理 LIFF 應用！'
+                  )}
                 >
                   <Share2 className="h-4 w-4 mr-2" />
                   分享到 LINE
