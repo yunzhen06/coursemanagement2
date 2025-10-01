@@ -116,23 +116,20 @@ export function GoogleAuthManager({
         throw new Error('未取得授權連結')
       }
 
-      // ✅ 先初始化 LIFF，確保 API 可用
-      const liffInitialized = await initializeLiff()
-      const lineEnv = getLineEnvironment()
-      
-      // ✅ 在 LINE 內且 API 可用就用 openWindow(external:true)，否則用 window.open
-      if (liffInitialized && lineEnv.isInClient && typeof window !== 'undefined' && (window as any).liff?.isApiAvailable?.('openWindow')) {
+      // ① 先初始化 LIFF，確保 API 可用
+      const inited = await initializeLiff()
+      const env = getLineEnvironment()
+      const canUseOpenWindow = inited && env.isInClient && env.isApiAvailable('openWindow')
+
+      // ② 在 LINE 內且 openWindow 可用 → 使用外部瀏覽器；否則回退到 window.open
+      if (canUseOpenWindow) {
         try {
-          // 使用統一的外部開啟工具函數
-          await openGoogleAuthInLiff(redirectUrl)
-          
-          // 在 LIFF 環境中，顯示提示訊息說明外部授權流程
-          setError('請在外部瀏覽器完成 Google 授權後，返回 LINE 重新整理頁面。授權完成後，您的 Google 帳號將自動連接。')
+          openGoogleAuthInLiff(redirectUrl)
+          setError('請在外部瀏覽器完成 Google 授權後，返回 LINE 重新整理頁面')
           setIsLoading(false)
           return
         } catch (liffError) {
-          console.error('LIFF 外部開啟失敗:', liffError)
-          // 如果 LIFF 失敗，回退到普通的 window.open
+          console.error('LIFF openWindow 失敗，改用一般視窗:', liffError)
         }
       }
 

@@ -215,13 +215,7 @@ export function RegistrationGoogleAuth({
                   </svg>
                   <div className="text-sm text-blue-800">
                     <p className="font-medium mb-1">授權流程說明</p>
-                    <p className="mb-2">點擊授權後會開啟外部瀏覽器進行 Google 登入：</p>
-                    <ul className="text-xs space-y-1 ml-2">
-                      <li>• 系統會自動開啟外部瀏覽器（Safari/Chrome）</li>
-                      <li>• 在外部瀏覽器中完成 Google 帳號登入</li>
-                      <li>• 授權完成後請返回 LINE 應用</li>
-                      <li>• 系統會自動完成帳號連接</li>
-                    </ul>
+                    <p>點擊授權後會開啟外部瀏覽器進行 Google 登入，完成後會自動返回 LINE 應用。</p>
                   </div>
                 </div>
               </div>
