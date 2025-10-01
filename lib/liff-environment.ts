@@ -3,7 +3,7 @@
  * 專門處理 LINE LIFF 環境中的特殊需求
  */
 
-import { isInLineApp, openExternalUrl } from './line-liff'
+import { isInLineApp, openExternalUrl, initializeLiff, getLineEnvironment } from './line-liff'
 
 /**
  * 檢測當前是否在 LIFF 環境中
@@ -31,13 +31,24 @@ export function isMobileDevice(): boolean {
  * 在 LIFF 環境中開啟外部 URL（Google OAuth）
  * 會自動選擇最適合的開啟方式
  */
-export function openGoogleAuthInLiff(authUrl: string): void {
-  if (isLiffEnvironment()) {
-    // 在 LIFF 環境中，使用 external: true 開啟外部瀏覽器
-    openExternalUrl(authUrl)
-  } else {
-    // 非 LIFF 環境，使用標準的新視窗開啟
-    window.open(authUrl, '_blank', 'noopener,noreferrer')
+export async function openGoogleAuthInLiff(authUrl: string): Promise<void> {
+  try {
+    // ✅ 先初始化 LIFF，確保 API 可用
+    const liffInitialized = await initializeLiff()
+    const lineEnv = getLineEnvironment()
+    
+    // ✅ 在 LINE 內且 API 可用就用 openExternalUrl，否則用 window.open
+    if (liffInitialized && lineEnv.isInClient && typeof window !== 'undefined' && (window as any).liff?.isApiAvailable?.('openWindow')) {
+      // 在 LIFF 環境中，使用 external: true 開啟外部瀏覽器
+      openExternalUrl(authUrl)
+    } else {
+      // 非 LIFF 環境或 API 不可用，使用標準的新視窗開啟
+      window.open(authUrl, '_blank', 'noopener,noreferrer,width=500,height=600,scrollbars=yes,resizable=yes')
+    }
+  } catch (error) {
+    console.error('開啟 Google 授權頁面失敗:', error)
+    // 回退到標準的新視窗開啟
+    window.open(authUrl, '_blank', 'noopener,noreferrer,width=500,height=600,scrollbars=yes,resizable=yes')
   }
 }
 

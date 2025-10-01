@@ -7,6 +7,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { GoogleIcon, AlertTriangleIcon, CheckIcon, RefreshIcon, SettingsIcon, CalendarIcon } from "@/components/icons"
 import { ApiService } from "@/services/apiService"
+import { initializeLiff, getLineEnvironment } from "@/lib/line-liff"
+import { openGoogleAuthInLiff } from "@/lib/liff-environment"
 
 interface GoogleAuthManagerProps {
   onAuthSuccess?: () => void
@@ -114,23 +116,22 @@ export function GoogleAuthManager({
         throw new Error('未取得授權連結')
       }
 
-      // 檢查是否在 LINE LIFF 環境中
-      const isInLiff = typeof window !== 'undefined' && (window as any).liff
+      // ✅ 先初始化 LIFF，確保 API 可用
+      const liffInitialized = await initializeLiff()
+      const lineEnv = getLineEnvironment()
       
-      if (isInLiff) {
-        // 在 LIFF 環境中，使用 liff.openWindow 打開外部瀏覽器
+      // ✅ 在 LINE 內且 API 可用就用 openWindow(external:true)，否則用 window.open
+      if (liffInitialized && lineEnv.isInClient && typeof window !== 'undefined' && (window as any).liff?.isApiAvailable?.('openWindow')) {
         try {
-          (window as any).liff.openWindow({
-            url: redirectUrl,
-            external: true
-          })
+          // 使用統一的外部開啟工具函數
+          await openGoogleAuthInLiff(redirectUrl)
           
-          // 在 LIFF 環境中，我們無法監聽授權完成，所以顯示提示訊息
-          setError('請在外部瀏覽器完成 Google 授權後，返回 LINE 重新整理頁面')
+          // 在 LIFF 環境中，顯示提示訊息說明外部授權流程
+          setError('請在外部瀏覽器完成 Google 授權後，返回 LINE 重新整理頁面。授權完成後，您的 Google 帳號將自動連接。')
           setIsLoading(false)
           return
         } catch (liffError) {
-          console.error('LIFF openWindow 失敗:', liffError)
+          console.error('LIFF 外部開啟失敗:', liffError)
           // 如果 LIFF 失敗，回退到普通的 window.open
         }
       }

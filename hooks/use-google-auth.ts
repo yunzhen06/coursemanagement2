@@ -134,7 +134,7 @@ export function useGoogleAuth() {
       }
 
       // 使用適合的方式開啟授權連結
-      openGoogleAuthInLiff(redirectUrl)
+      await openGoogleAuthInLiff(redirectUrl)
 
       return new Promise((resolve, reject) => {
         // 設置 postMessage 監聽器
