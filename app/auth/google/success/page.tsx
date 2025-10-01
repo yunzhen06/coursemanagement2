@@ -29,12 +29,22 @@ export default function GoogleAuthSuccessPage() {
         }
       } catch {}
 
-      // 若後端標示回到首頁（redirect=/），直接導回首頁，不進入註冊頁邏輯
-      if (redirectHint === '/') {
+      // 若後端標示回到首頁（redirect=/ 或 redirect=home），直接導回首頁，不進入註冊頁邏輯
+      if (redirectHint === '/' || redirectHint === 'home') {
         setStatus('registered')
         setTimeout(() => {
           router.replace('/')
-        }, 800)
+        }, 500)  // 縮短延遲時間，更快跳轉
+        return
+      }
+
+      // 檢查是否有明確的註冊完成標示
+      const isRegisteredParam = params.get('registered') === 'true'
+      if (isRegisteredParam) {
+        setStatus('registered')
+        setTimeout(() => {
+          router.replace('/')
+        }, 500)
         return
       }
 
