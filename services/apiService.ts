@@ -1,4 +1,4 @@
-import { createCsrfHeaders, fetchCsrfToken } from '@/lib/csrf-token'
+import { createCsrfHeaders, fetchCsrfToken, getCsrfToken } from '@/lib/csrf-token'
 
 // 根據環境設定 API 基礎 URL
 function getApiBaseUrl(): string {
@@ -168,6 +168,15 @@ export class ApiService {
             contentType: response.headers.get('content-type') || '',
             bodyPreview: errText ? errText.slice(0, 500) : '',
             json: errJson,
+            requestHeaders: Object.fromEntries(
+              Object.entries(baseHeaders).map(([k, v]) => [
+                k, 
+                k.toLowerCase().includes('token') ? (v ? 'present' : 'missing') : v
+              ])
+            ),
+            requestBody: options.body instanceof FormData ? 'FormData' : 
+                        typeof options.body === 'string' ? options.body.slice(0, 200) + '...' : 
+                        'N/A'
           })
         } catch {}
         return {
@@ -791,8 +800,23 @@ export class ApiService {
 
     // 需要在瀏覽器端先取得 CSRF cookie
     if (typeof window !== 'undefined') {
-      try { await fetchCsrfToken('') } catch {}
+      try { 
+        // 先嘗試取得 CSRF token
+        const publicApiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/+$/,'')
+        const csrfUrl = publicApiBase ? `${publicApiBase}/api/csrf/` : '/api/csrf/'
+        await fetchCsrfToken(csrfUrl) 
+      } catch (error) {
+        console.warn('無法取得 CSRF token:', error)
+      }
     }
+
+    console.log('[preRegister] 發送請求:', {
+      id_token: id_token ? `${id_token.substring(0, 20)}...` : 'null',
+      line_user_id: this.lineUserId,
+      role,
+      name,
+      csrfToken: getCsrfToken() ? 'present' : 'missing'
+    })
 
     return this.request<{ redirectUrl: string }>(
       '/onboard/pre_register/',
