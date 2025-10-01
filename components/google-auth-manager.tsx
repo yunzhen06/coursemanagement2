@@ -7,8 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { GoogleIcon, AlertTriangleIcon, CheckIcon, RefreshIcon, SettingsIcon, CalendarIcon } from "@/components/icons"
 import { ApiService } from "@/services/apiService"
-import { initializeLiff, getLineEnvironment } from "@/lib/line-liff"
-import { openGoogleAuthInLiff } from "@/lib/liff-environment"
+import { openExternalUrl, isInLineApp } from "@/lib/line-liff"
 
 interface GoogleAuthManagerProps {
   onAuthSuccess?: () => void
@@ -116,79 +115,18 @@ export function GoogleAuthManager({
         throw new Error('未取得授權連結')
       }
 
-      // 直接交由共用工具決定最佳開啟方式（在 LINE 內建瀏覽器避免先開 LIFF）
-      openGoogleAuthInLiff(redirectUrl)
-      setError('請在外部瀏覽器完成 Google 授權後，返回 LINE 重新整理頁面')
-      setIsLoading(false)
-      return
-
-      // 在普通瀏覽器環境中打開新視窗
-      const authWindow = window.open(
-        redirectUrl,
-        'google-auth',
-        'width=500,height=600,scrollbars=yes,resizable=yes'
-      )
-
-      if (!authWindow) {
-        throw new Error('無法打開授權視窗，請檢查瀏覽器彈出視窗設定')
-      }
-
-      // 監聽授權完成訊息
-      const handleMessage = (event: MessageEvent) => {
-        if (event.origin !== window.location.origin) return
-        
-        if (event.data.type === 'google-auth-success') {
-          window.removeEventListener('message', handleMessage)
-          if (authWindow && !authWindow.closed) {
-            authWindow.close()
-          }
-          // 儲存 line_user_id 以利後續 API 調用
-          try {
-            const incomingId = (event.data as any)?.line_user_id
-            if (typeof incomingId === 'string' && incomingId.trim()) {
-              ApiService.setLineUserId(incomingId)
-              if (typeof window !== 'undefined') {
-                localStorage.setItem('lineUserId', incomingId)
-              }
-            }
-          } catch {}
-          checkAuthStatus()
-          onAuthSuccess?.()
-        } else if (event.data.type === 'google-auth-error') {
-          window.removeEventListener('message', handleMessage)
-          if (authWindow && !authWindow.closed) {
-            authWindow.close()
-          }
-          setError(event.data.error || '授權失敗')
-          onAuthError?.(event.data.error || '授權失敗')
-        }
-      }
-
-      window.addEventListener('message', handleMessage)
-
-      // 備用方案：定期檢查視窗是否關閉
-      const checkWindowClosed = setInterval(() => {
-        if (authWindow?.closed) {
-          clearInterval(checkWindowClosed)
-          window.removeEventListener('message', handleMessage)
-          
-          // 檢查授權狀態
-          setTimeout(async () => {
-            await checkAuthStatus()
-            setIsLoading(false)
-          }, 1000)
-        }
-      }, 1000)
-
-      // 10分鐘後自動停止檢查
-      setTimeout(() => {
-        clearInterval(checkWindowClosed)
-        window.removeEventListener('message', handleMessage)
-        if (authWindow && !authWindow.closed) {
-          authWindow.close()
-        }
+      // 在 LIFF 環境中：使用外部瀏覽器開啟，並提示回到 LINE
+      if (isInLineApp()) {
+        openExternalUrl(redirectUrl)
+        setError('請在外部瀏覽器完成 Google 授權後返回 LINE，系統會自動切換頁面')
         setIsLoading(false)
-      }, 600000)
+        return
+      }
+
+      // 非 LIFF 環境：以新分頁開啟，不設置監聽或輪詢
+      window.open(redirectUrl, '_blank', 'noopener,noreferrer')
+      setError('已開啟授權頁面，完成後請回到本頁繼續')
+      setIsLoading(false)
     } catch (error) {
       console.error('Google 授權失敗:', error)
       setError('授權過程中發生錯誤')

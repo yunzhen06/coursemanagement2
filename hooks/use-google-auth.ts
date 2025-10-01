@@ -5,7 +5,6 @@ import { ApiService } from '@/services/apiService'
 import { getIdToken, parseLiffReturn } from '@/lib/line-liff'
 import { 
   openGoogleAuthInLiff, 
-  setupGoogleAuthMessageListener,
   parseGoogleAuthCallback,
   cleanupOAuthParams,
   isLiffEnvironment
@@ -133,86 +132,11 @@ export function useGoogleAuth() {
         return userEmail
       }
 
-      // 使用適合的方式開啟授權連結
+      // 使用適合的方式開啟授權連結（LIFF 外部或新分頁）
       openGoogleAuthInLiff(redirectUrl)
-
-      return new Promise((resolve, reject) => {
-        // 設置 postMessage 監聽器
-        const cleanup = setupGoogleAuthMessageListener(
-          (data) => {
-            cleanup()
-            
-            // 儲存 line_user_id 以備之後 API 使用
-            if (data.line_user_id) {
-              ApiService.setLineUserId(data.line_user_id)
-              if (typeof window !== 'undefined') {
-                localStorage.setItem('lineUserId', data.line_user_id)
-              }
-            }
-            
-            const userEmail = data.email || 'user@gmail.com'
-            setAuthorized(true, userEmail)
-            setLoading(false)
-            resolve(userEmail)
-          },
-          (error) => {
-            cleanup()
-            setError(error)
-            setLoading(false)
-            reject(new Error(error))
-          }
-        )
-
-        // 備用方案：輪詢檢查授權狀態
-        const startedAt = Date.now()
-        const poll = setInterval(async () => {
-          // 超時 10 分鐘
-          if (Date.now() - startedAt > 10 * 60 * 1000) {
-            clearInterval(poll)
-            cleanup()
-            setLoading(false)
-            setError('授權超時')
-            reject(new Error('授權超時'))
-            return
-          }
-
-          try {
-            // 檢查 URL 參數（LIFF deep link 返回）
-            const ret = parseLiffReturn()
-            if ((ret.email && ret.email.includes('@')) || ret.lineUserId) {
-              clearInterval(poll)
-              cleanup()
-              
-              // 儲存 line_user_id 以備之後 API 使用
-              if (ret.lineUserId) {
-                ApiService.setLineUserId(ret.lineUserId)
-                if (typeof window !== 'undefined') {
-                  localStorage.setItem('lineUserId', ret.lineUserId)
-                }
-              }
-              const userEmail = ret.email || 'user@gmail.com'
-              setAuthorized(true, userEmail)
-              setLoading(false)
-              resolve(userEmail)
-              return
-            }
-
-            // 後端連線測試作為最後備援
-            const response = await ApiService.getGoogleApiStatus()
-            if (response.data && (response.data as any).is_connected) {
-              clearInterval(poll)
-              cleanup()
-              const userEmail = 'user@gmail.com'
-              setAuthorized(true, userEmail)
-              setLoading(false)
-              resolve(userEmail)
-              return
-            }
-          } catch (e) {
-            // 忽略暫時性錯誤，繼續輪詢
-          }
-        }, 3000) // 降低輪詢頻率到 3 秒
-      })
+      // 不再設置 postMessage 或輪詢；成功後由成功頁面與 LIFF deep link 邏輯處理
+      setLoading(false)
+      return null
     } catch (error) {
       console.error('Google 授權失敗:', error)
       setError('授權過程中發生錯誤')
