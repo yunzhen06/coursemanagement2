@@ -56,11 +56,16 @@ export function useGoogleAuth() {
       if (canUsePreRegister) {
         const idToken = getIdToken()
         if (typeof idToken === 'string' && idToken.trim()) {
-          resp = await ApiService.preRegister({
-            id_token: idToken,
-            role: payload!.role!,
-            name: payload!.name!,
-          })
+          try {
+            resp = await ApiService.preRegister({
+              id_token: idToken,
+              role: payload!.role!,
+              name: payload!.name!,
+            })
+          } catch (e) {
+            // 預註冊失敗時，改用直接 OAuth
+            resp = await ApiService.getGoogleOAuthUrl()
+          }
         } else {
           // 取不到 id_token 時退回直接 OAuth
           resp = await ApiService.getGoogleOAuthUrl()
@@ -70,11 +75,20 @@ export function useGoogleAuth() {
         resp = await ApiService.getGoogleOAuthUrl()
       }
 
-      if (resp.error) {
-        throw new Error(resp.error)
+      // 若預註冊返回錯誤或未取得連結，嘗試再取一次直接 OAuth 連結
+      if (resp?.error) {
+        try {
+          resp = await ApiService.getGoogleOAuthUrl()
+        } catch {}
       }
-      const data: any = resp.data || {}
-      const redirectUrl = data.redirectUrl || data.auth_url || ''
+      const data: any = resp?.data || {}
+      let redirectUrl: string = data.redirectUrl || data.auth_url || ''
+      if (!redirectUrl || typeof redirectUrl !== 'string') {
+        try {
+          const fallback = await ApiService.getGoogleOAuthUrl()
+          redirectUrl = fallback?.data?.redirectUrl || fallback?.data?.auth_url || ''
+        } catch {}
+      }
       if (!redirectUrl || typeof redirectUrl !== 'string') {
         throw new Error('未取得授權連結')
       }
