@@ -22,7 +22,7 @@ export interface UserProfile {
 export class UserService {
   // 基底 URL（僅用於非 v2 路徑時會進一步映射）
   private static baseUrl = (typeof window !== 'undefined')
-    ? (process.env.NEXT_PUBLIC_API_BASE_URL || '')
+    ? 'http://localhost:8000'
     : (process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
 
   private static getOnboardBase(): string {

@@ -2,9 +2,9 @@ import { createCsrfHeaders, fetchCsrfToken } from '@/lib/csrf-token'
 
 // 根據環境設定 API 基礎 URL
 function getApiBaseUrl(): string {
-  // 在瀏覽器環境中，使用 Next.js 代理
+  // 直接連接到後端，不使用 Next.js 代理
   if (typeof window !== 'undefined') {
-    return '/api/v2'
+    return 'http://localhost:8000/api/v2'
   }
   
   // 在伺服器環境中，使用環境變數或預設值
