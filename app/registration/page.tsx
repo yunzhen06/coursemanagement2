@@ -39,7 +39,8 @@ export default function RegistrationPage() {
 
   // 狀態管理
   const [registrationStatus, setRegistrationStatus] = useState<'checking' | 'not_registered' | 'error'>('checking')
-  const hasCheckedRef = useRef(false)
+  // 記住最後一次檢查的使用者 ID；避免因初始假 ID 導致永遠停留在註冊頁
+  const lastCheckedUidRef = useRef<string>('')
 
   // 已註冊使用者導向守衛：若已綁定則離開註冊頁
   const uidMemo = useMemo(() => {
@@ -48,22 +49,32 @@ export default function RegistrationPage() {
   }, [lineUser?.userId])
 
   useEffect(() => {
-    const checkRegistrationOnce = async () => {
-      if (hasCheckedRef.current || !uidMemo) return
-      
-      hasCheckedRef.current = true
+    const checkRegistration = async () => {
+      if (!uidMemo) return
+      // 只有當使用者 ID 變更時才重新檢查，避免初始假 ID 導致誤判後不再更新
+      if (lastCheckedUidRef.current === uidMemo) return
+      lastCheckedUidRef.current = uidMemo
+
       setRegistrationStatus('checking')
-      
+
       try {
         // 確保後續 API 請求帶入正確的 LINE 使用者 ID
         try { ApiService.setLineUserId(uidMemo) } catch {}
-        
+
         const registered = await UserService.getOnboardStatus(uidMemo)
-        
+
         if (registered) {
-          // 已註冊用戶自動跳轉到主頁面
-          console.log('用戶已註冊，自動跳轉到主頁面')
-          router.replace('/')
+          console.log('用戶已註冊，離開註冊流程')
+          // 在 LIFF 內直接關閉視窗；一般瀏覽器導回首頁
+          try {
+            if (isLiffEnvironment()) {
+              closeLiffWindow()
+            } else {
+              router.replace('/')
+            }
+          } catch {
+            router.replace('/')
+          }
           return
         } else {
           setRegistrationStatus('not_registered')
@@ -74,7 +85,7 @@ export default function RegistrationPage() {
       }
     }
 
-    checkRegistrationOnce()
+    checkRegistration()
   }, [uidMemo, router])
 
 
@@ -126,10 +137,18 @@ export default function RegistrationPage() {
   const handleComplete = async () => {
     const success = await completeRegistration()
     if (success) {
-      // 註冊成功後自動跳轉到主頁
+      // 註冊成功後：LIFF 內關閉視窗；一般瀏覽器 2 秒後導回首頁
       setTimeout(() => {
-        router.replace('/')
-      }, 2000) // 2秒後跳轉，讓用戶看到成功訊息
+        try {
+          if (isLiffEnvironment()) {
+            closeLiffWindow()
+          } else {
+            router.replace('/')
+          }
+        } catch {
+          router.replace('/')
+        }
+      }, 2000)
     }
   }
 
