@@ -22,12 +22,10 @@ export default function GoogleAuthSuccessPage() {
       const effectiveId = lineUserId || fromLiff.lineUserId || ''
       const redirectHint = fromLiff.redirect || ''
 
-      try {
-        if (effectiveId) {
-          localStorage.setItem('lineUserId', effectiveId)
-          ApiService.setLineUserId(effectiveId)
-        }
-      } catch {}
+      // 僅設定記憶體中的 lineUserId，不寫入 localStorage
+      if (effectiveId) {
+        ApiService.setLineUserId(effectiveId)
+      }
 
       // 若後端標示回到首頁（redirect=/），直接導回首頁，不進入註冊頁邏輯
       if (redirectHint === '/') {

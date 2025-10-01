@@ -30,26 +30,14 @@ export function useNotificationSettings() {
   const [settings, setSettings] = useState<NotificationSettings>(defaultSettings)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Load settings from localStorage on mount
+  // 不再從 localStorage 載入設定，使用記憶體中的預設值
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("notificationSettings")
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        setSettings({ ...defaultSettings, ...parsed })
-      }
-    } catch (error) {
-      console.error("Error loading notification settings:", error)
-    } finally {
-      setIsLoading(false)
-    }
+    setIsLoading(false)
   }, [])
 
-  // Save settings to localStorage whenever they change
+  // 設定變更時不進行本地儲存
   useEffect(() => {
-    if (!isLoading) {
-      localStorage.setItem("notificationSettings", JSON.stringify(settings))
-    }
+    // 可在此發送事件或呼叫 API 以持久化到後端（若需要）
   }, [settings, isLoading])
 
   const updateSettings = (updates: Partial<NotificationSettings>) => {

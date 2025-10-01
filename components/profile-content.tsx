@@ -86,22 +86,13 @@ export function ProfileContent({ user: propUser, onUserChange }: ProfileContentP
     }
   }, [propUser])
 
-  // Load notification settings from localStorage on component mount
+  // 不再從 localStorage 載入通知設定，僅使用記憶體狀態
   useEffect(() => {
-    const savedSettings = localStorage.getItem("notificationSettings")
-    if (savedSettings) {
-      try {
-        const parsedSettings = JSON.parse(savedSettings)
-        setNotificationSettings(parsedSettings)
-      } catch (error) {
-        console.error("Failed to parse notification settings:", error)
-      }
-    }
+    // 保持預設設定即可
   }, [])
 
   useEffect(() => {
-    localStorage.setItem("notificationSettings", JSON.stringify(notificationSettings))
-    // Dispatch custom event to notify other components of settings change
+    // 使用事件通知其他元件設定已變更，不進行本地儲存
     window.dispatchEvent(
       new CustomEvent("notificationSettingsChanged", {
         detail: notificationSettings,

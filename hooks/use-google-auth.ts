@@ -118,12 +118,9 @@ export function useGoogleAuth() {
         // 清理 URL 參數
         cleanupOAuthParams()
         
-        // 儲存用戶數據
+        // 儲存用戶數據（不寫入 localStorage）
         if (callbackData.lineUserId) {
           ApiService.setLineUserId(callbackData.lineUserId)
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('lineUserId', callbackData.lineUserId)
-          }
         }
         
         const userEmail = callbackData.email || 'user@gmail.com'

@@ -16,7 +16,7 @@ export function useCustomCategories(lineUserId: string) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // 載入分類資料（優先走後端，失敗時退回 localStorage）
+  // 載入分類資料（僅走後端；失敗時顯示空列表或錯誤）
   const fetchCategories = useCallback(async () => {
     if (!lineUserId) return
 
@@ -38,19 +38,8 @@ export function useCustomCategories(lineUserId: string) {
         setCategories(categories)
         return
       }
-
-      // 退回 localStorage 作為備援
-      const stored = localStorage.getItem('customCategories')
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        const categoriesWithDates = parsed.map((cat: any) => ({
-          ...cat,
-          createdAt: new Date(cat.createdAt),
-        }))
-        setCategories(categoriesWithDates)
-      } else {
-        setCategories([])
-      }
+      // 未取得有效資料時，顯示空列表
+      setCategories([])
     } catch (error) {
       setError(error instanceof Error ? error.message : '載入自定義分類失敗')
     } finally {
@@ -62,10 +51,9 @@ export function useCustomCategories(lineUserId: string) {
     fetchCategories()
   }, [fetchCategories])
 
-  // 儲存分類到 localStorage（暫時方案）
+  // 僅更新記憶體中的分類（不進行本地儲存）
   const saveCategories = (newCategories: CustomCategory[]) => {
     setCategories(newCategories)
-    localStorage.setItem("customCategories", JSON.stringify(newCategories))
   }
 
   const addCategory = useCallback(async (category: Omit<CustomCategory, "id" | "createdAt">) => {
@@ -84,7 +72,7 @@ export function useCustomCategories(lineUserId: string) {
         return created
       }
 
-      // 後備：localStorage
+      // 後備：在記憶體中新增暫時分類（不持久化）
       const newCategory: CustomCategory = {
         ...category,
         id: Date.now().toString(),
