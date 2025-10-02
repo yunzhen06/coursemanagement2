@@ -69,6 +69,11 @@ export const useLineAuth = () => {
             error: null
           })
           console.log('✅ 本地模式：已跳過 LIFF 並使用假 userId', dummyId)
+          console.log('🔧 [useLineAuth] 環境變數檢查:')
+          console.log('  - NEXT_PUBLIC_SKIP_LIFF_LOCAL:', process.env.NEXT_PUBLIC_SKIP_LIFF_LOCAL)
+          console.log('  - NEXT_PUBLIC_LIFF_ID:', process.env.NEXT_PUBLIC_LIFF_ID)
+          console.log('  - NODE_ENV:', process.env.NODE_ENV)
+          console.log('  - shouldSkipLiffLocal:', shouldSkipLiffLocal)
           return
         }
 

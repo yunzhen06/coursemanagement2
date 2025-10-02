@@ -29,13 +29,32 @@ export function useUserAuth(options?: UserAuthOptions) {
   // 檢查用戶是否已註冊（以 google_refresh_token 是否存在為準）
   const checkUserRegistration = async (lineUserId: string) => {
     try {
+      console.log('🔍 [useUserAuth] 開始檢查用戶註冊狀態，LINE User ID:', lineUserId)
       setAuthState(prev => ({ ...prev, isLoading: true, error: null }))
 
+      // 檢查是否為假的 LINE User ID（本地開發模式）
+      if (lineUserId.startsWith('guest-local-')) {
+        console.log('⚠️ [useUserAuth] 檢測到本地假 LINE User ID，將回傳未註冊狀態')
+        setAuthState({
+          isAuthenticated: false,
+          user: null,
+          isLoading: false,
+          error: null,
+          needsRegistration: true
+        })
+        return
+      }
+
+      console.log('📡 [useUserAuth] 調用 API 檢查註冊狀態...')
       const registered = await UserService.getOnboardStatus(lineUserId)
+      console.log('📋 [useUserAuth] API 回傳註冊狀態:', registered)
+      
       if (registered) {
+        console.log('✅ [useUserAuth] 用戶已註冊，獲取詳細資料...')
         // 已註冊則讀取詳細 Profile
         const user = await UserService.getUserByLineId(lineUserId)
         await UserService.recordLogin(lineUserId)
+        console.log('👤 [useUserAuth] 用戶資料:', user)
         setAuthState({
           isAuthenticated: true,
           user,
@@ -44,6 +63,7 @@ export function useUserAuth(options?: UserAuthOptions) {
           needsRegistration: false
         })
       } else {
+        console.log('❌ [useUserAuth] 用戶未註冊，需要進入註冊流程')
         // 未註冊，進入註冊流程
         setAuthState({
           isAuthenticated: false,
@@ -55,6 +75,7 @@ export function useUserAuth(options?: UserAuthOptions) {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '檢查用戶狀態失敗'
+      console.error('💥 [useUserAuth] 檢查用戶註冊狀態時發生錯誤:', error)
       setAuthState({
         isAuthenticated: false,
         user: null,
