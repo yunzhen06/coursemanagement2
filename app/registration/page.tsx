@@ -51,11 +51,20 @@ export default function RegistrationPage() {
   useEffect(() => {
     const checkRegistration = async () => {
       if (!uidMemo) return
+      
+      // 避免檢查假的或無效的 ID（通常以 'guest_' 或 'fake_' 開頭）
+      if (uidMemo.startsWith('guest_') || uidMemo.startsWith('fake_') || uidMemo.length < 10) {
+        console.log('跳過檢查無效的使用者 ID:', uidMemo)
+        setRegistrationStatus('not_registered')
+        return
+      }
+      
       // 只有當使用者 ID 變更時才重新檢查，避免初始假 ID 導致誤判後不再更新
       if (lastCheckedUidRef.current === uidMemo) return
       lastCheckedUidRef.current = uidMemo
 
       setRegistrationStatus('checking')
+      console.log('檢查註冊狀態，LINE User ID:', uidMemo)
 
       try {
         // 確保後續 API 請求帶入正確的 LINE 使用者 ID
@@ -64,24 +73,29 @@ export default function RegistrationPage() {
         const registered = await UserService.getOnboardStatus(uidMemo)
 
         if (registered) {
-          console.log('用戶已註冊，離開註冊流程')
+          console.log('✅ 用戶已註冊，自動跳轉到應用首頁')
           // 在 LIFF 內直接關閉視窗；一般瀏覽器導回首頁
           try {
             if (isLiffEnvironment()) {
+              console.log('LIFF 環境：關閉視窗')
               closeLiffWindow()
             } else {
+              console.log('一般瀏覽器：跳轉到首頁')
               router.replace('/')
             }
           } catch {
+            console.log('跳轉失敗，使用備用方案')
             router.replace('/')
           }
           return
         } else {
+          console.log('❌ 用戶未註冊，允許進入註冊流程')
           setRegistrationStatus('not_registered')
         }
       } catch (e) {
         console.error('檢查註冊狀態失敗:', e)
-        setRegistrationStatus('error')
+        // 如果檢查失敗，為了安全起見，允許用戶進入註冊流程
+        setRegistrationStatus('not_registered')
       }
     }
 

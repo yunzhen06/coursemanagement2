@@ -73,11 +73,18 @@ export default function HomePage() {
   
   // 權限檢查 - 重定向未註冊用戶
   useEffect(() => {
-    if (!authLoading && needsRegistration) {
-      console.log('用戶未註冊，重定向到註冊頁面')
-      router.replace('/registration')
+    if (authLoading) {
+      console.log('🔄 正在檢查用戶認證狀態...')
+      return
     }
-  }, [authLoading, needsRegistration, router])
+    
+    if (needsRegistration) {
+      console.log('❌ 用戶未註冊，自動重定向到註冊頁面')
+      router.replace('/registration')
+    } else if (isAuthenticated) {
+      console.log('✅ 用戶已認證，允許訪問應用首頁')
+    }
+  }, [authLoading, needsRegistration, isAuthenticated, router])
 
   // 使用 LINE 認證獲取真實的 user ID
   const { user: lineUser, isLoggedIn: isLineLoggedIn, isLoading: lineLoading } = useLineAuth()
