@@ -238,6 +238,8 @@ export class UserService {
     try {
       const url = `${this.getOnboardBase()}/onboard/status/${lineUserId}/`
       console.log('[UserService] 查詢註冊狀態 URL:', url)
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 8000)
       const response = await fetch(url, {
         headers: {
           'Accept': 'application/json',
@@ -245,7 +247,9 @@ export class UserService {
         },
         credentials: 'include',
         cache: 'no-store',
+        signal: controller.signal,
       })
+      clearTimeout(timeout)
       if (!response.ok) {
         console.error('查詢註冊狀態失敗:', response.status, response.statusText)
         return false
@@ -259,7 +263,7 @@ export class UserService {
       const data = await response.json()
       return !!(data && (data as any).registered)
     } catch (error) {
-      console.error('查詢註冊狀態失敗:', error)
+      console.error('查詢註冊狀態失敗或逾時:', error)
       return false
     }
   }

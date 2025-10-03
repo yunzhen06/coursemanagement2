@@ -102,6 +102,20 @@ export default function RegistrationPage() {
     checkRegistration()
   }, [uidMemo, router])
 
+  // 直接輸入 /registration 的守衛：未登入則引導登入或返回首頁
+  useEffect(() => {
+    if (lineLoading) return
+    if (!skipLiff && !isLoggedIn) {
+      console.log('未登入，啟動 LINE 登入流程或回首頁')
+      try {
+        login()
+      } catch (e) {
+        console.error('啟動 LINE 登入失敗，導向首頁備援:', e)
+        router.replace('/')
+      }
+    }
+  }, [lineLoading, isLoggedIn, skipLiff, login, router])
+
 
 
   // Google 授權處理
@@ -151,18 +165,17 @@ export default function RegistrationPage() {
   const handleComplete = async () => {
     const success = await completeRegistration()
     if (success) {
-      // 註冊成功後：LIFF 內關閉視窗；一般瀏覽器 2 秒後導回首頁
-      setTimeout(() => {
-        try {
-          if (isLiffEnvironment()) {
-            closeLiffWindow()
-          } else {
-            router.replace('/')
-          }
-        } catch {
+      // 註冊成功後：立即跳轉，不保留於註冊頁面
+      try {
+        if (isLiffEnvironment()) {
+          closeLiffWindow()
+        } else {
           router.replace('/')
         }
-      }, 2000)
+      } catch (e) {
+        console.error('註冊完成跳轉失敗，使用備援至首頁:', e)
+        router.replace('/')
+      }
     }
   }
 
@@ -220,75 +233,18 @@ export default function RegistrationPage() {
 
 
 
-  // 註冊完成頁面
+  // 註冊完成後：不顯示成功頁，立即跳轉
   if (isCompleted) {
-    // 顯示成功訊息後，數秒自動關閉（在 LINE 內）或導向 LINE 主頁
-    useEffect(() => {
-      const timer = setTimeout(() => {
-        if (typeof window !== 'undefined') {
-          // 若在 LINE 內，關閉 LIFF 視窗；否則導向到 /line
-          try {
-            closeLiffWindow()
-          } catch {}
-          router.replace('/line')
-        }
-      }, 3000)
-      return () => clearTimeout(timer)
-    }, [])
-
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center p-4">
-        <div className="w-full max-w-md space-y-8">
-          <div className="text-center space-y-4">
-            <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto">
-              <CheckCircle className="w-8 h-8 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                🎉 註冊完成！
-              </h1>
-              <p className="text-gray-600">
-                歡迎使用我們的智能課程管理系統（3 秒後自動關閉/導向）
-              </p>
-            </div>
-          </div>
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6 space-y-4">
-              <div className="text-center space-y-2">
-                <p className="font-semibold text-gray-900">註冊資訊</p>
-                <div className="space-y-1 text-sm text-gray-600">
-                  <p><span className="font-medium">姓名：</span>{data.name}</p>
-                  <p><span className="font-medium">身分：</span>{data.role === 'teacher' ? '🎓 教師' : '📚 學生'}</p>
-                  <p><span className="font-medium">Google 帳號：</span>{data.googleEmail}</p>
-                </div>
-              </div>
-              
-              <div className="border-t pt-4">
-                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-green-600">✅</span>
-                    <span className="text-sm text-green-800 font-medium">帳號綁定完成</span>
-                  </div>
-                  <p className="text-xs text-green-700 mt-1">
-                    歡迎訊息已發送到您的 LINE，所有功能已啟用！
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="text-center space-y-2">
-            <p className="text-sm text-gray-500">
-              註冊完成，您已可在 LINE Bot 使用功能
-            </p>
-            <p className="text-xs text-gray-400">
-              📱 請查看 LINE 訊息獲取功能選單
-            </p>
-          </div>
-        </div>
-      </div>
-    )
+    try {
+      if (isLiffEnvironment()) {
+        closeLiffWindow()
+      } else {
+        router.replace('/')
+      }
+    } catch {
+      router.replace('/')
+    }
+    return null
   }
 
   // 錯誤狀態

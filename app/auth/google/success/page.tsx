@@ -32,9 +32,7 @@ export default function GoogleAuthSuccessPage() {
       // 若後端標示回到首頁（redirect=/ 或 redirect=home），直接導回首頁，不進入註冊頁邏輯
       if (redirectHint === '/' || redirectHint === 'home') {
         setStatus('registered')
-        setTimeout(() => {
-          router.replace('/')
-        }, 500)  // 縮短延遲時間，更快跳轉
+        router.replace('/')
         return
       }
 
@@ -42,9 +40,7 @@ export default function GoogleAuthSuccessPage() {
       const isRegisteredParam = params.get('registered') === 'true'
       if (isRegisteredParam) {
         setStatus('registered')
-        setTimeout(() => {
-          router.replace('/')
-        }, 500)
+        router.replace('/')
         return
       }
 
@@ -54,29 +50,19 @@ export default function GoogleAuthSuccessPage() {
           const isRegistered = await UserService.getOnboardStatus(effectiveId)
           if (isRegistered) {
             setStatus('registered')
-            // 已註冊用戶直接跳轉到主頁
-            setTimeout(() => {
-              router.replace('/')
-            }, 1500)
+            router.replace('/')
           } else {
             setStatus('needs_registration')
-            // 未完成註冊的用戶通知父頁面或跳轉到註冊頁
-            setTimeout(() => {
-              router.replace('/registration')
-            }, 1500)
+            router.replace('/registration')
           }
         } catch (error) {
           console.error('檢查註冊狀態失敗:', error)
           setStatus('needs_registration')
-          setTimeout(() => {
-            router.replace('/registration')
-          }, 1500)
+          router.replace('/registration')
         }
       } else {
         setStatus('needs_registration')
-        setTimeout(() => {
-          router.replace('/registration')
-        }, 1500)
+        router.replace('/registration')
       }
     }
 
