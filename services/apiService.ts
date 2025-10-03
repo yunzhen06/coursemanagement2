@@ -2,13 +2,13 @@ import { createCsrfHeaders, fetchCsrfToken } from '@/lib/csrf-token'
 
 // 根據環境設定 API 基礎 URL
 function getApiBaseUrl(): string {
-  // 直接連接到後端，不使用 Next.js 代理
+  // 在瀏覽器環境中，使用 Next.js 代理
   if (typeof window !== 'undefined') {
-    return 'http://localhost:8000/api/v2'
+    return '/api/v2'
   }
   
-  // 在伺服器環境中，使用環境變數或預設值
-  return process.env.BACKEND_API_URL ? `${process.env.BACKEND_API_URL}/api/v2` : 'http://localhost:8000/api/v2'
+  // 在伺服器環境中，使用環境變數
+  return process.env.BACKEND_API_URL ? `${process.env.BACKEND_API_URL}/api/v2` : '/api/v2'
 }
 
 const API_BASE_URL = getApiBaseUrl()
@@ -19,7 +19,7 @@ function getBackendBaseUrl(): string {
     return ''
   }
   
-  return process.env.BACKEND_API_URL || 'http://localhost:8000'
+  return process.env.BACKEND_API_URL || ''
 }
 
 // 取得 CSRF token
@@ -70,20 +70,11 @@ export class ApiService {
 
   // 不再產生訪客 ID；僅從現有狀態或儲存中取得（若不存在則回傳空字串）
   static bootstrapLineUserId(): string {
-    if (typeof window === 'undefined') return this.lineUserId || ''
-    try {
-      const KEY = 'lineUserId'
-      const id = localStorage.getItem(KEY) || ''
-      if (id) {
-        this.setLineUserId(id)
-      }
-      return id
-    } catch {
-      return this.lineUserId || ''
-    }
+    // 完全移除 localStorage 依賴；僅回傳記憶體中的值
+    return this.lineUserId || ''
   }
 
-  private static async request<T>(
+  private static async request<T = any>(
     endpoint: string, 
     options: RequestInit = {},
     // 新增：API 路徑前綴，預設為 /api/v2
@@ -95,32 +86,13 @@ export class ApiService {
       // 根據前綴決定基礎 URL
       let baseUrl: string
       if (typeof window !== 'undefined') {
-        // 瀏覽器端，優先使用公開環境變數作為後端 API 基底
-        const publicApiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/+$/,'')
-        if (publicApiBase) {
-          const lower = publicApiBase.toLowerCase()
-          const endsV2 = /\/api\/v2$/.test(lower)
-          const endsApi = /\/api$/.test(lower)
-          const endsNone = !/\/api(\/v2)?$/.test(lower)
-
-          if (apiPrefix === 'v2') {
-            baseUrl = endsV2 ? publicApiBase : endsApi ? `${publicApiBase}/v2` : `${publicApiBase}/api/v2`
-          } else if (apiPrefix === 'onboard') {
-            baseUrl = endsV2 ? publicApiBase.replace(/\/api\/v2$/, '/api') : endsApi ? publicApiBase : `${publicApiBase}/api`
-          } else if (apiPrefix === 'oauth') {
-            baseUrl = endsV2 ? publicApiBase.replace(/\/api\/v2$/, '/api/oauth') : endsApi ? `${publicApiBase}/oauth` : `${publicApiBase}/api/oauth`
-          } else {
-            baseUrl = publicApiBase
-          }
-        } else {
-          // 後援：未設定環境變數時走 Next.js 代理
-          if (apiPrefix === 'oauth') baseUrl = '/api/oauth'
-          else if (apiPrefix === 'onboard') baseUrl = '/api'
-          else baseUrl = '/api/v2'
-        }
+        // 瀏覽器端一律走 Next.js 代理，避免公開變數配置錯誤造成跨網域與 CORS 問題
+        if (apiPrefix === 'oauth') baseUrl = '/api/oauth'
+        else if (apiPrefix === 'onboard') baseUrl = '/api'
+        else baseUrl = '/api/v2'
       } else {
         // 伺服器端，使用環境變數
-        const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:8000'
+        const backendUrl = process.env.BACKEND_API_URL || ''
         if (apiPrefix === 'oauth') baseUrl = `${backendUrl}/api/oauth`
         else if (apiPrefix === 'onboard') baseUrl = `${backendUrl}/api`
         else baseUrl = `${backendUrl}/api/v2`

@@ -14,8 +14,8 @@ export class OCRService {
       console.log("[OCR] 開始掃描圖片:", file.name)
       
       const response = await ApiService.ocrSchedulePreview(file)
-      
-      if (!response.success) {
+      const ok = !response.error
+      if (!ok) {
         console.error("[OCR] 掃描失敗:", response.error)
         return {
           success: false,
@@ -57,8 +57,8 @@ export class OCRService {
       console.log("[OCR] 確認創建課程:", selectedCourses.length, "個")
       
       const response = await ApiService.ocrScheduleConfirm(selectedCourses)
-      
-      if (!response.success) {
+      const ok = !response.error
+      if (!ok) {
         console.error("[OCR] 創建失敗:", response.error)
         return {
           success: false,

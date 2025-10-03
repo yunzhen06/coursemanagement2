@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 
 export interface NotificationSettings {
   assignmentReminderTiming: string // "15min" | "30min" | "1hour" | "2hours" | "1day" | "2days" | "1week"
@@ -28,29 +28,7 @@ const defaultSettings: NotificationSettings = {
 
 export function useNotificationSettings() {
   const [settings, setSettings] = useState<NotificationSettings>(defaultSettings)
-  const [isLoading, setIsLoading] = useState(true)
-
-  // Load settings from localStorage on mount
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem("notificationSettings")
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        setSettings({ ...defaultSettings, ...parsed })
-      }
-    } catch (error) {
-      console.error("Error loading notification settings:", error)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  // Save settings to localStorage whenever they change
-  useEffect(() => {
-    if (!isLoading) {
-      localStorage.setItem("notificationSettings", JSON.stringify(settings))
-    }
-  }, [settings, isLoading])
+  const isLoading = false
 
   const updateSettings = (updates: Partial<NotificationSettings>) => {
     setSettings((prev) => ({ ...prev, ...updates }))

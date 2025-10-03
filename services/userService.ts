@@ -20,13 +20,20 @@ export interface UserProfile {
 }
 
 export class UserService {
-  // 基底 URL（僅用於非 v2 路徑時會進一步映射）
-  private static baseUrl = (typeof window !== 'undefined')
-    ? 'http://localhost:8000'
-    : (process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
+  private static resolveBaseUrl(): string {
+    const candidate = (typeof window !== 'undefined')
+      ? process.env.NEXT_PUBLIC_API_URL
+      : (process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_API_URL)
+
+    if (!candidate) {
+      throw new Error('BACKEND_API_URL is not configured')
+    }
+
+    return candidate.replace(/\/+$/, '')
+  }
 
   private static getOnboardBase(): string {
-    const raw = (this.baseUrl || '').replace(/\/+$/,'')
+    const raw = this.resolveBaseUrl()
     const lower = raw.toLowerCase()
     if (/\/api\/v2$/.test(lower)) return raw.replace(/\/api\/v2$/, '/api')
     if (/\/api$/.test(lower)) return raw
@@ -38,7 +45,8 @@ export class UserService {
    */
   static async registerUser(data: UserRegistrationData): Promise<UserProfile> {
     try {
-      const response = await fetch(`${this.baseUrl}/api/users/register`, {
+      const baseUrl = this.resolveBaseUrl()
+      const response = await fetch(`${baseUrl}/api/users/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -62,7 +70,8 @@ export class UserService {
    */
   static async getUserByLineId(lineUserId: string): Promise<UserProfile | null> {
     try {
-      const response = await fetch(`${this.baseUrl}/api/v2/profile/${lineUserId}/`)
+      const baseUrl = this.resolveBaseUrl()
+      const response = await fetch(`${baseUrl}/api/v2/profile/${lineUserId}/`)
 
       if (response.status === 404) {
         return null // 用戶不存在
@@ -84,7 +93,8 @@ export class UserService {
    */
   static async getUserByGoogleEmail(googleEmail: string): Promise<UserProfile | null> {
     try {
-      const response = await fetch(`${this.baseUrl}/api/users/google/${encodeURIComponent(googleEmail)}`)
+      const baseUrl = this.resolveBaseUrl()
+      const response = await fetch(`${baseUrl}/api/users/google/${encodeURIComponent(googleEmail)}`)
 
       if (response.status === 404) {
         return null // 用戶不存在
@@ -106,7 +116,8 @@ export class UserService {
    */
   static async updateUser(userId: string, updates: Partial<UserProfile>): Promise<UserProfile> {
     try {
-      const response = await fetch(`${this.baseUrl}/api/users/${userId}`, {
+      const baseUrl = this.resolveBaseUrl()
+      const response = await fetch(`${baseUrl}/api/users/${userId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -156,7 +167,8 @@ export class UserService {
    */
   static async bindLineAndGoogle(lineUserId: string, googleEmail: string): Promise<boolean> {
     try {
-      const response = await fetch(`${this.baseUrl}/api/users/bind`, {
+      const baseUrl = this.resolveBaseUrl()
+      const response = await fetch(`${baseUrl}/api/users/bind`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -183,7 +195,8 @@ export class UserService {
    */
   static async recordLogin(lineUserId: string): Promise<void> {
     try {
-      await fetch(`${this.baseUrl}/api/users/login`, {
+      const baseUrl = this.resolveBaseUrl()
+      await fetch(`${baseUrl}/api/users/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -204,7 +217,8 @@ export class UserService {
    */
   static async sendRegistrationCompleteMessage(lineUserId: string, name: string, role: UserRole): Promise<boolean> {
     try {
-      const response = await fetch(`${this.baseUrl}/line/render-flex/`, {
+      const baseUrl = this.resolveBaseUrl()
+      const response = await fetch(`${baseUrl}/line/render-flex/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

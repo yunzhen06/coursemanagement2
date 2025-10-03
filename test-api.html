@@ -21,7 +21,7 @@
     <div id="results"></div>
 
     <script>
-        const API_BASE = 'http://localhost:8000';
+        const API_BASE = window.__API_BASE__ || '';
         const LINE_USER_ID = 'Uc8858c883da4bd4aecf9271aaa019a45';
         
         function addResult(message, isSuccess = true) {

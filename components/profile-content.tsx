@@ -86,21 +86,7 @@ export function ProfileContent({ user: propUser, onUserChange }: ProfileContentP
     }
   }, [propUser])
 
-  // Load notification settings from localStorage on component mount
   useEffect(() => {
-    const savedSettings = localStorage.getItem("notificationSettings")
-    if (savedSettings) {
-      try {
-        const parsedSettings = JSON.parse(savedSettings)
-        setNotificationSettings(parsedSettings)
-      } catch (error) {
-        console.error("Failed to parse notification settings:", error)
-      }
-    }
-  }, [])
-
-  useEffect(() => {
-    localStorage.setItem("notificationSettings", JSON.stringify(notificationSettings))
     // Dispatch custom event to notify other components of settings change
     window.dispatchEvent(
       new CustomEvent("notificationSettingsChanged", {
@@ -611,30 +597,6 @@ export function ProfileContent({ user: propUser, onUserChange }: ProfileContentP
 }
 
 export function getNotificationSettings(): NotificationSettings {
-  if (typeof window === "undefined") {
-    // Return default settings for server-side rendering
-    return {
-      assignmentReminders: true,
-      examReminders: true,
-      assignmentReminderTiming: "1day",
-      lineNotifications: true,
-      browserNotifications: true,
-      doNotDisturbEnabled: false,
-      doNotDisturbStart: "22:00",
-      doNotDisturbEnd: "08:00",
-    }
-  }
-
-  const savedSettings = localStorage.getItem("notificationSettings")
-  if (savedSettings) {
-    try {
-      return JSON.parse(savedSettings)
-    } catch (error) {
-      console.error("Failed to parse notification settings:", error)
-    }
-  }
-
-  // Return default settings if none saved
   return {
     assignmentReminders: true,
     examReminders: true,

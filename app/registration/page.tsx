@@ -18,9 +18,7 @@ import { Button } from '@/components/ui/button'
 
 export default function RegistrationPage() {
   const router = useRouter()
-  const { isLoggedIn, isLoading: lineLoading, login, getDevInfo } = useLineAuth()
-  const devInfo = getDevInfo()
-  const skipLiff = !!devInfo?.skipLiff
+  const { isLoggedIn, isLoading: lineLoading, login } = useLineAuth()
   const { authorize: authorizeGoogle, isLoading: googleLoading } = useGoogleAuth()
   const {
     currentStep,
@@ -51,13 +49,6 @@ export default function RegistrationPage() {
   useEffect(() => {
     const checkRegistration = async () => {
       if (!uidMemo) return
-      
-      // 避免檢查假的或無效的 ID（通常以 'guest_' 或 'fake_' 開頭）
-      if (uidMemo.startsWith('guest_') || uidMemo.startsWith('fake_') || uidMemo.length < 10) {
-        console.log('跳過檢查無效的使用者 ID:', uidMemo)
-        setRegistrationStatus('not_registered')
-        return
-      }
       
       // 只有當使用者 ID 變更時才重新檢查，避免初始假 ID 導致誤判後不再更新
       if (lastCheckedUidRef.current === uidMemo) return
@@ -105,7 +96,7 @@ export default function RegistrationPage() {
   // 直接輸入 /registration 的守衛：未登入則引導登入或返回首頁
   useEffect(() => {
     if (lineLoading) return
-    if (!skipLiff && !isLoggedIn) {
+    if (!isLoggedIn) {
       console.log('未登入，啟動 LINE 登入流程或回首頁')
       try {
         login()
@@ -114,7 +105,7 @@ export default function RegistrationPage() {
         router.replace('/')
       }
     }
-  }, [lineLoading, isLoggedIn, skipLiff, login, router])
+  }, [lineLoading, isLoggedIn, login, router])
 
 
 
@@ -268,7 +259,7 @@ export default function RegistrationPage() {
 
   // 如果 LINE 未登入，顯示說明（在本地可能已跳過授權）
   // 本地略過 LIFF 時，不阻擋註冊流程，讓使用者可直接選擇身分
-  if (!isLoggedIn && !lineLoading && !skipLiff) {
+  if (!isLoggedIn && !lineLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center p-4">
         <div className="w-full max-w-md">
@@ -276,11 +267,7 @@ export default function RegistrationPage() {
             <CardContent className="p-8 text-center space-y-6">
               <div className="space-y-2">
                 <h1 className="text-2xl font-bold text-gray-900">歡迎使用課程管理系統</h1>
-                {skipLiff ? (
-                  <p className="text-gray-600">本地開發模式：已略過 LINE 授權</p>
-                ) : (
-                  <p className="text-gray-600">正在前往 LINE 授權頁面</p>
-                )}
+                <p className="text-gray-600">正在前往 LINE 授權頁面</p>
               </div>
               
               <div className="space-y-4">
@@ -289,15 +276,9 @@ export default function RegistrationPage() {
                     <span className="text-blue-600">📱</span>
                     <span className="text-sm font-medium text-blue-800">LINE 登入授權</span>
                   </div>
-                  {skipLiff ? (
-                    <p className="text-xs text-blue-700">
-                      您目前在本地環境，系統不會進行 LINE 授權。可直接進行註冊或以訪客模式測試功能。
-                    </p>
-                  ) : (
-                    <p className="text-xs text-blue-700">
-                      系統會自動為您導向 LINE 登入授權。若未自動跳轉，請從 LINE 內再次開啟此頁，或重新整理。
-                    </p>
-                  )}
+                  <p className="text-xs text-blue-700">
+                    系統會自動為您導向 LINE 登入授權。若未自動跳轉，請從 LINE 內再次開啟此頁，或重新整理。
+                  </p>
                 </div>
                 
                 <div className="text-sm text-gray-500">
@@ -312,11 +293,7 @@ export default function RegistrationPage() {
 
               <div className="flex items-center justify-center space-x-2 text-gray-500">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                {skipLiff ? (
-                  <span className="text-sm">本地環境：未進行 LINE 授權</span>
-                ) : (
-                  <span className="text-sm">等待導向至 LINE 授權...</span>
-                )}
+                <span className="text-sm">等待導向至 LINE 授權...</span>
               </div>
             </CardContent>
           </Card>

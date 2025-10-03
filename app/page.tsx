@@ -96,7 +96,7 @@ export default function HomePage() {
       setLineUserId(lineUser.userId)
       ApiService.setLineUserId(lineUser.userId)
     } else {
-      // 如果沒有 LINE 登入，使用 guest ID 作為備援
+      // 未登入時維持空的 LINE 使用者識別
       const id = ApiService.bootstrapLineUserId()
       setLineUserId(id)
     }

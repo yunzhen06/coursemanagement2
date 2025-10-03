@@ -19,26 +19,12 @@ export function AuthGate({ children }: AuthGateProps) {
   })
   const { isLoading: lineLoading, isLoggedIn } = useLineAuth()
 
-  // 本地開發環境跳過條件
-  const shouldSkipLiffLocal = (
-    process.env.NEXT_PUBLIC_SKIP_LIFF_LOCAL === 'true' ||
-    (!process.env.NEXT_PUBLIC_LIFF_ID && (process.env.NODE_ENV !== 'production'))
-  )
-
   useEffect(() => {
     if (isRegistrationPage) return
 
     if (lineLoading || authLoading) return
 
-    // 開發模式：若還沒取到 userId 就持續顯示等待畫面
-    if (shouldSkipLiffLocal) {
-      if (lineProfile?.userId && needsRegistration) {
-        router.replace('/registration')
-      }
-      return
-    }
-
-    // LIFF 正式環境：沒有登入 LINE 視為尚未註冊
+    // 沒有登入 LINE 視為需註冊
     if (!isLoggedIn) {
       router.replace('/registration')
       return
@@ -47,21 +33,14 @@ export function AuthGate({ children }: AuthGateProps) {
     if (needsRegistration) {
       router.replace('/registration')
     }
-  }, [isRegistrationPage, lineLoading, authLoading, isLoggedIn, needsRegistration, lineProfile?.userId, router, shouldSkipLiffLocal])
+  }, [isRegistrationPage, lineLoading, authLoading, isLoggedIn, needsRegistration, lineProfile?.userId, router])
 
   if (isRegistrationPage) {
     return <>{children}</>
   }
 
-  // 在本地開發環境中，只要有 lineProfile?.userId 就允許進入
-  if (shouldSkipLiffLocal) {
-    if (!lineLoading && !authLoading && lineProfile?.userId && !needsRegistration) {
-      return <>{children}</>
-    }
-  } else {
-    if (!lineLoading && !authLoading && isLoggedIn && !needsRegistration) {
-      return <>{children}</>
-    }
+  if (!lineLoading && !authLoading && isLoggedIn && !needsRegistration) {
+    return <>{children}</>
   }
 
   return (

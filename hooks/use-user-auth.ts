@@ -32,19 +32,6 @@ export function useUserAuth(options?: UserAuthOptions) {
       console.log('🔍 [useUserAuth] 開始檢查用戶註冊狀態，LINE User ID:', lineUserId)
       setAuthState(prev => ({ ...prev, isLoading: true, error: null }))
 
-      // 檢查是否為假的 LINE User ID（本地開發模式）
-      if (lineUserId.startsWith('guest-local-')) {
-        console.log('⚠️ [useUserAuth] 檢測到本地假 LINE User ID，將回傳未註冊狀態')
-        setAuthState({
-          isAuthenticated: false,
-          user: null,
-          isLoading: false,
-          error: null,
-          needsRegistration: true
-        })
-        return
-      }
-
       console.log('📡 [useUserAuth] 調用 API 檢查註冊狀態...')
       const registered = await UserService.getOnboardStatus(lineUserId)
       console.log('📋 [useUserAuth] API 回傳註冊狀態:', registered)

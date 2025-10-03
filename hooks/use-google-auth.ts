@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { ApiService } from '@/services/apiService'
-import { getIdToken, parseLiffReturn } from '@/lib/line-liff'
+import { getIdToken } from '@/lib/line-liff'
 import { 
   openGoogleAuthInLiff, 
   parseGoogleAuthCallback,
@@ -121,12 +121,9 @@ export function useGoogleAuth() {
         // 儲存用戶數據
         if (callbackData.lineUserId) {
           ApiService.setLineUserId(callbackData.lineUserId)
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('lineUserId', callbackData.lineUserId)
-          }
         }
-        
-        const userEmail = callbackData.email || 'user@gmail.com'
+
+        const userEmail = callbackData.email || undefined
         setAuthorized(true, userEmail)
         setLoading(false)
         return userEmail
@@ -149,7 +146,9 @@ export function useGoogleAuth() {
     try {
       const response = await ApiService.getGoogleApiStatus()
       if (response.data && (response.data as any).is_connected) {
-        setAuthorized(true, 'user@gmail.com') // 模擬 email
+        const data: any = response.data
+        const email = data.account_email || data.email || data.google_email || undefined
+        setAuthorized(true, email)
         return true
       }
       return false

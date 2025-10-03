@@ -24,7 +24,6 @@ export default function GoogleAuthSuccessPage() {
 
       try {
         if (effectiveId) {
-          localStorage.setItem('lineUserId', effectiveId)
           ApiService.setLineUserId(effectiveId)
         }
       } catch {}

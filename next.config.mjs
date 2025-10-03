@@ -10,7 +10,10 @@ const nextConfig = {
     unoptimized: true,
   },
   async rewrites() {
-    const apiBaseUrl = process.env.BACKEND_API_URL || 'http://localhost:8000'
+    const apiBaseUrl = process.env.BACKEND_API_URL
+    if (!apiBaseUrl) {
+      throw new Error('BACKEND_API_URL is not configured')
+    }
     
     return [
       // 代理 API，確保尾斜線保留
