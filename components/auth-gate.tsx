@@ -14,7 +14,7 @@ export function AuthGate({ children }: AuthGateProps) {
   const pathname = usePathname()
   const router = useRouter()
   const isRegistrationPage = pathname === '/registration'
-  const { isAuthenticated, isLoading: authLoading, needsRegistration, lineProfile } = useUserAuth({
+  const { isLoading: authLoading, needsRegistration, lineProfile } = useUserAuth({
     skipAutoCheck: isRegistrationPage
   })
   const { isLoading: lineLoading, isLoggedIn } = useLineAuth()
@@ -28,28 +28,26 @@ export function AuthGate({ children }: AuthGateProps) {
   useEffect(() => {
     if (isRegistrationPage) return
 
-    if (!lineLoading && !authLoading) {
-      // 在本地開發環境中，只要有 lineProfile?.userId 就允許進入
-      if (shouldSkipLiffLocal) {
-        if (!lineProfile?.userId) {
-          router.replace('/registration')
-        }
-        return
-      }
+    if (lineLoading || authLoading) return
 
-      // 伺服器環境：檢查是否需要註冊，但允許已登入用戶進入
-      if (!lineProfile?.userId) {
+    // 開發模式：若還沒取到 userId 就持續顯示等待畫面
+    if (shouldSkipLiffLocal) {
+      if (lineProfile?.userId && needsRegistration) {
         router.replace('/registration')
-        return
       }
-
-      // 如果用戶已登入但需要註冊，重定向到註冊頁面
-      if (needsRegistration) {
-        router.replace('/registration')
-        return
-      }
+      return
     }
-  }, [isRegistrationPage, lineLoading, authLoading, isLoggedIn, needsRegistration, isAuthenticated, lineProfile?.userId, router, shouldSkipLiffLocal])
+
+    // LIFF 正式環境：沒有登入 LINE 視為尚未註冊
+    if (!isLoggedIn) {
+      router.replace('/registration')
+      return
+    }
+
+    if (needsRegistration) {
+      router.replace('/registration')
+    }
+  }, [isRegistrationPage, lineLoading, authLoading, isLoggedIn, needsRegistration, lineProfile?.userId, router, shouldSkipLiffLocal])
 
   if (isRegistrationPage) {
     return <>{children}</>
@@ -57,12 +55,11 @@ export function AuthGate({ children }: AuthGateProps) {
 
   // 在本地開發環境中，只要有 lineProfile?.userId 就允許進入
   if (shouldSkipLiffLocal) {
-    if (!lineLoading && !authLoading && lineProfile?.userId) {
+    if (!lineLoading && !authLoading && lineProfile?.userId && !needsRegistration) {
       return <>{children}</>
     }
   } else {
-    // 伺服器環境：只要有 lineProfile?.userId 且不需要註冊就允許進入
-    if (!lineLoading && !authLoading && lineProfile?.userId && !needsRegistration) {
+    if (!lineLoading && !authLoading && isLoggedIn && !needsRegistration) {
       return <>{children}</>
     }
   }
