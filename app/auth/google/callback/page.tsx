@@ -14,55 +14,62 @@ export default function GoogleAuthSuccessPage() {
     const handleAuthSuccess = async () => {
       const params = new URLSearchParams(window.location.search)
       const email = params.get('email') || ''
-      const lineUserId = params.get('line_user_id') || ''
+      const lineUserIdParam = params.get('line_user_id') || ''
 
       // 若從 LIFF deep link 回來，參數同樣可讀
       const fromLiff = parseLiffReturn()
       const effectiveEmail = email || fromLiff.email || ''
-      const effectiveId = lineUserId || fromLiff.lineUserId || ''
+      const effectiveId = lineUserIdParam || fromLiff.lineUserId || ''
       const redirectHint = fromLiff.redirect || ''
+      const isRegisteredParam = params.get('registered') === 'true'
 
       try {
-        if (effectiveId) {
-          ApiService.setLineUserId(effectiveId)
+        if (effectiveId) ApiService.setLineUserId(effectiveId)
+      } catch {}
+
+      // 先查後端狀態（避免回去了還是看到註冊）
+      let alreadyRegistered = false
+      if (effectiveId) {
+        try {
+          alreadyRegistered = isRegisteredParam || (await UserService.getOnboardStatus(effectiveId))
+        } catch {
+          alreadyRegistered = false
+        }
+      }
+
+      // —— 關鍵：把結果送回原分頁 —— //
+      const payload = {
+        type: 'GOOGLE_AUTH_RESULT',
+        payload: {
+          lineUserId: effectiveId,
+          email: effectiveEmail,
+          registered: alreadyRegistered,
+        },
+      }
+
+      // 1) postMessage 回 opener（同網域）
+      try {
+        if (window.opener) {
+          window.opener.postMessage(payload, window.location.origin)
         }
       } catch {}
 
-      // 若後端標示回到首頁（redirect=/ 或 redirect=home），直接導回首頁，不進入註冊頁邏輯
-      if (redirectHint === '/' || redirectHint === 'home') {
-        setStatus('registered')
-        router.replace('/')
-        return
-      }
+      // 2) localStorage（觸發其他分頁的 storage 事件）
+      try {
+        localStorage.setItem('GOOGLE_AUTH_RESULT', JSON.stringify({ ...payload.payload, ts: Date.now() }))
+      } catch {}
 
-      // 檢查是否有明確的註冊完成標示
-      const isRegisteredParam = params.get('registered') === 'true'
-      if (isRegisteredParam) {
+      // 若後端要求直接回首頁
+      if (redirectHint === '/' || redirectHint === 'home' || alreadyRegistered) {
         setStatus('registered')
-        router.replace('/')
-        return
-      }
-
-      // 檢查用戶是否已完成註冊
-      if (effectiveId) {
-        try {
-          const isRegistered = await UserService.getOnboardStatus(effectiveId)
-          if (isRegistered) {
-            setStatus('registered')
-            router.replace('/')
-          } else {
-            setStatus('needs_registration')
-            router.replace('/registration')
-          }
-        } catch (error) {
-          console.error('檢查註冊狀態失敗:', error)
-          setStatus('needs_registration')
-          router.replace('/registration')
-        }
       } else {
         setStatus('needs_registration')
-        router.replace('/registration')
       }
+
+      // 嘗試關閉自己（若由 window.open 開啟）
+      try { window.close() } catch {}
+
+      // 若關不掉，留一個按鈕讓使用者返回原分頁
     }
 
     handleAuthSuccess()
@@ -70,27 +77,25 @@ export default function GoogleAuthSuccessPage() {
 
   const getStatusMessage = () => {
     switch (status) {
-      case 'checking':
-        return '正在檢查註冊狀態...'
-      case 'registered':
-        return '授權完成，正在跳轉到主頁...'
-      case 'needs_registration':
-        return '授權完成，正在跳轉到註冊頁...'
-      default:
-        return '處理中...'
+      case 'checking': return '正在檢查註冊狀態...'
+      case 'registered': return '授權完成，可回到原分頁'
+      case 'needs_registration': return '授權完成，回原分頁繼續'
+      default: return '處理中...'
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-green-50">
-      <div className="text-center">
-        <div className="text-6xl mb-4">✅</div>
-        <h1 className="text-2xl font-bold text-green-800 mb-2">
-          授權成功！
-        </h1>
-        <p className="text-green-600">
-          {getStatusMessage()}
-        </p>
+    <div className="min-h-screen flex items-center justify-center bg-green-50 p-6">
+      <div className="text-center space-y-3">
+        <div className="text-6xl">✅</div>
+        <h1 className="text-2xl font-bold text-green-800">Google 授權成功</h1>
+        <p className="text-green-700">{getStatusMessage()}</p>
+        <button
+          onClick={() => (window.location.href = '/registration')}
+          className="mt-4 px-4 py-2 rounded bg-green-600 text-white"
+        >
+          回到註冊頁
+        </button>
       </div>
     </div>
   )
