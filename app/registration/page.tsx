@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useRegistrationFlow } from '@/hooks/use-registration-flow'
 import { ApiService } from '@/services/apiService'
@@ -16,11 +16,8 @@ import { closeLiffWindow, getIdToken } from '@/lib/line-liff'
 import { isLiffEnvironment } from '@/lib/liff-environment'
 import { Button } from '@/components/ui/button'
 
-const SS_KEYS = {
-  AWAIT_GOOGLE: 'REG_AWAIT_GOOGLE',
-  GOOGLE_DONE: 'GOOGLE_AUTH_DONE',
-  LINE_UID: 'LINE_UID',
-} as const
+const REG_STEP_KEY = 'REG_CURRENT_STEP'
+const GOOGLE_AUTH_RESULT_KEY = 'GOOGLE_AUTH_RESULT'
 
 export default function RegistrationPage() {
   const router = useRouter()
@@ -40,62 +37,54 @@ export default function RegistrationPage() {
     lineUser
   } = useRegistrationFlow()
 
-  const [registrationStatus, setRegistrationStatus] =
-    useState<'checking' | 'not_registered' | 'error'>('checking')
-
-  // 避免同一 UID 重複判斷被擋到（可用 force 重新檢查）
+  const [registrationStatus, setRegistrationStatus] = useState<'checking' | 'not_registered' | 'error'>('checking')
   const lastCheckedUidRef = useRef<string>('')
 
-  // 取得候選的真實 UID（含 sessionStorage 備援）
+  // 讀取/寫入目前步驟，避免刷新又回第一步
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(REG_STEP_KEY)
+      if (saved) {
+        const n = Number(saved)
+        if (Number.isInteger(n) && n >= 1 && n <= 3 && n !== currentStep) {
+          // 用最小副作用的方式前進到指定步驟
+          // 只在需要時才連續呼叫 nextStep
+          const diff = n - currentStep
+          if (diff > 0) {
+            for (let i = 0; i < diff; i++) nextStep()
+          }
+        }
+      }
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    try { sessionStorage.setItem(REG_STEP_KEY, String(currentStep)) } catch {}
+  }, [currentStep])
+
+  // 只接受真正的 LINE userId（不再產假 ID）
   const uidMemo = useMemo(() => {
-    const fromHook = lineUser?.userId
-    const fromApi = ApiService.getLineUserId()
-    const fromSS = typeof window !== 'undefined' ? sessionStorage.getItem(SS_KEYS.LINE_UID) || '' : ''
-    const uid = fromHook || fromApi || fromSS || ''
-    if (uid && typeof window !== 'undefined') {
-      try {
-        sessionStorage.setItem(SS_KEYS.LINE_UID, uid)
-      } catch {}
-    }
-    return uid
+    return lineUser?.userId || ApiService.getLineUserId() || ''
   }, [lineUser?.userId])
 
-  // 抽出「查核是否已綁定」的可重用函式
-  const checkRegistration = useCallback(
-    async (opts?: { force?: boolean }) => {
-      const { force } = opts || {}
-      const uid = uidMemo
-
-      if (!uid) {
-        // 外部瀏覽器尚未有 UID：讓使用者可先填表
+  // 檢查是否已註冊
+  useEffect(() => {
+    const checkRegistration = async () => {
+      if (!uidMemo) {
         if (!isLiffEnvironment()) setRegistrationStatus('not_registered')
         return
       }
-
-      if (!force && lastCheckedUidRef.current === uid) return
-      lastCheckedUidRef.current = uid
+      if (lastCheckedUidRef.current === uidMemo) return
+      lastCheckedUidRef.current = uidMemo
 
       setRegistrationStatus('checking')
       try {
-        try {
-          ApiService.setLineUserId(uid)
-          if (typeof window !== 'undefined') {
-            sessionStorage.setItem(SS_KEYS.LINE_UID, uid)
-          }
-        } catch {}
-
-        const registered = await UserService.getOnboardStatus(uid)
+        ApiService.setLineUserId(uidMemo)
+        const registered = await UserService.getOnboardStatus(uidMemo)
         if (registered) {
-          // 已完成，直接離開註冊頁
-          if (typeof window !== 'undefined') {
-            sessionStorage.removeItem(SS_KEYS.AWAIT_GOOGLE)
-            sessionStorage.removeItem(SS_KEYS.GOOGLE_DONE)
-          }
-          if (isLiffEnvironment()) {
-            closeLiffWindow()
-          } else {
-            router.replace('/')
-          }
+          if (isLiffEnvironment()) closeLiffWindow()
+          else router.replace('/')
           return
         }
         setRegistrationStatus('not_registered')
@@ -103,77 +92,112 @@ export default function RegistrationPage() {
         console.error('檢查註冊狀態失敗:', e)
         setRegistrationStatus('not_registered')
       }
-    },
-    [uidMemo, router]
-  )
-
-  // 首次進入或 UID 變更時檢查
-  useEffect(() => {
+    }
     checkRegistration()
-  }, [checkRegistration])
+  }, [uidMemo, router])
 
-  // 僅在 LIFF 內且未登入才自動觸發 LINE 登入
+  // 僅在 LIFF 內，且未登入才觸發 LINE 授權；外部瀏覽器不阻擋流程
   useEffect(() => {
     if (lineLoading) return
     if (!isLoggedIn) {
       if (isLiffEnvironment()) {
-        try {
-          login()
-        } catch (e) {
-          console.error('啟動 LINE 登入失敗，導向首頁備援:', e)
-          router.replace('/')
-        }
+        try { login() } catch { router.replace('/') }
       } else {
         if (registrationStatus === 'checking') setRegistrationStatus('not_registered')
       }
     }
   }, [lineLoading, isLoggedIn, login, router, registrationStatus])
 
-  // 🔁 關鍵：當「回到此分頁」或「跨分頁 storage 變更」時，強制重新查核是否已綁定
+  // 🔑 監聽 Google Callback 回傳（postMessage + localStorage 備援）
   useEffect(() => {
-    const onFocus = () => {
-      // 若剛做完 Google（另一分頁），回到此分頁時會觸發
-      lastCheckedUidRef.current = '' // 允許再次查核
-      checkRegistration({ force: true })
-    }
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        lastCheckedUidRef.current = ''
-        checkRegistration({ force: true })
-      }
-    }
-    const onStorage = (e: StorageEvent) => {
-      if (!e.key) return
-      if (e.key === SS_KEYS.GOOGLE_DONE || e.key === SS_KEYS.LINE_UID) {
-        lastCheckedUidRef.current = ''
-        checkRegistration({ force: true })
+    const handleMessage = async (evt: MessageEvent) => {
+      try {
+        if (!evt || !evt.data || evt.origin !== window.location.origin) return
+        if (evt.data?.type !== 'GOOGLE_AUTH_RESULT') return
+        const { lineUserId, email, registered } = evt.data.payload || {}
+        await handleGoogleAuthResult(lineUserId, email, registered)
+      } catch (e) {
+        console.error('處理 postMessage 失敗:', e)
       }
     }
 
-    window.addEventListener('focus', onFocus)
-    document.addEventListener('visibilitychange', onVisibility)
-    window.addEventListener('storage', onStorage)
+    const handleStorage = async (evt: StorageEvent) => {
+      try {
+        if (evt.key !== GOOGLE_AUTH_RESULT_KEY || !evt.newValue) return
+        const parsed = JSON.parse(evt.newValue)
+        const { lineUserId, email, registered } = parsed || {}
+        await handleGoogleAuthResult(lineUserId, email, registered)
+      } catch (e) {
+        console.error('處理 storage 事件失敗:', e)
+      }
+    }
+
+    window.addEventListener('message', handleMessage)
+    window.addEventListener('storage', handleStorage)
+
+    // 若 callback 分頁寫入得很快，這裡也嘗試讀一次 localStorage
+    try {
+      const cached = localStorage.getItem(GOOGLE_AUTH_RESULT_KEY)
+      if (cached) {
+        const { lineUserId, email, registered } = JSON.parse(cached)
+        handleGoogleAuthResult(lineUserId, email, registered)
+      }
+    } catch {}
+
     return () => {
-      window.removeEventListener('focus', onFocus)
-      document.removeEventListener('visibilitychange', onVisibility)
-      window.removeEventListener('storage', onStorage)
+      window.removeEventListener('message', handleMessage)
+      window.removeEventListener('storage', handleStorage)
     }
-  }, [checkRegistration])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  // Google 授權流程
+  // 將 callback 結果套用到當前頁（設定 lineUserId → 前進 → 輪詢註冊狀態）
+  const handleGoogleAuthResult = async (lineUserId?: string, email?: string, registered?: boolean) => {
+    try {
+      if (lineUserId) {
+        ApiService.setLineUserId(lineUserId)
+        updateData({ lineUserId })
+      }
+      if (email) {
+        updateData({ googleEmail: email })
+      }
+
+      // 使用者已經完成（後端已寫 token）
+      if (registered) {
+        try { sessionStorage.removeItem(REG_STEP_KEY) } catch {}
+        router.replace('/')
+        return
+      }
+
+      // 尚未標示完成 → 啟動一次性短輪詢（最多 8 次 / 12 秒）
+      let tries = 0
+      const timer = setInterval(async () => {
+        tries += 1
+        try {
+          const uid = lineUserId || ApiService.getLineUserId()
+          if (!uid) return
+          const ok = await UserService.getOnboardStatus(uid)
+          if (ok) {
+            clearInterval(timer)
+            try { sessionStorage.removeItem(REG_STEP_KEY) } catch {}
+            router.replace('/')
+          } else {
+            // 讓畫面停在第 3 步顯示「已開啟 Google 授權…」
+            if (currentStep < 3) nextStep()
+          }
+        } catch {}
+        if (tries >= 8) clearInterval(timer)
+      }, 1500)
+    } catch (e) {
+      console.error('套用 Google 回傳結果失敗:', e)
+    }
+  }
+
+  // Google 授權（維持你原本的寫法）
   const handleGoogleAuth = async () => {
     try {
       const role = data.role ?? undefined
       const name = data.name || ''
-
-      // 標記「期待回來後自動檢查」
-      if (typeof window !== 'undefined') {
-        try {
-          sessionStorage.setItem(SS_KEYS.AWAIT_GOOGLE, '1')
-          if (uidMemo) sessionStorage.setItem(SS_KEYS.LINE_UID, uidMemo)
-        } catch {}
-      }
-
       let redirectUrl = ''
       if (isLiffEnvironment() && lineUser?.userId && role && name) {
         const idToken = getIdToken()
@@ -194,15 +218,15 @@ export default function RegistrationPage() {
         alert('後端未回傳 redirectUrl')
         return
       }
-
-      // 在 LIFF：外部瀏覽器開啟；非 LIFF：整頁導向
       if (typeof window !== 'undefined' && (window as any).liff?.openWindow) {
-        ;(window as any).liff.openWindow({ url: redirectUrl, external: true })
+        (window as any).liff.openWindow({ url: redirectUrl, external: true })
       } else {
-        window.location.href = redirectUrl
+        // 用新分頁開啟，讓 callback 能 window.opener.postMessage 回來
+        window.open(redirectUrl, '_blank', 'noopener,noreferrer')
       }
-
-      console.log('已開啟 Google 授權，完成後回到本分頁將自動檢查狀態')
+      // 記住目前在第 3 步（避免刷新退回第一步）
+      try { sessionStorage.setItem(REG_STEP_KEY, '3') } catch {}
+      console.log('已開啟 Google 授權，請完成後返回應用程式')
     } catch (error) {
       console.error('Google 授權失敗:', error)
     }
@@ -212,19 +236,15 @@ export default function RegistrationPage() {
     const success = await completeRegistration()
     if (success) {
       try {
-        if (isLiffEnvironment()) {
-          closeLiffWindow()
-        } else {
-          router.replace('/')
-        }
-      } catch (e) {
-        console.error('註冊完成跳轉失敗，使用備援至首頁:', e)
+        if (isLiffEnvironment()) closeLiffWindow()
+        else router.replace('/')
+      } catch {
         router.replace('/')
       }
     }
   }
 
-  // ===== UI 狀態 =====
+  // ===== UI 狀態（保持你原本的 UI） =====
   if (lineLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
@@ -270,11 +290,8 @@ export default function RegistrationPage() {
 
   if (isCompleted) {
     try {
-      if (isLiffEnvironment()) {
-        closeLiffWindow()
-      } else {
-        router.replace('/')
-      }
+      if (isLiffEnvironment()) closeLiffWindow()
+      else router.replace('/')
     } catch {
       router.replace('/')
     }
@@ -299,7 +316,6 @@ export default function RegistrationPage() {
     )
   }
 
-  // 外部瀏覽器、或 LIFF 尚未登入時的提示（但不阻擋流程）
   if (!isLoggedIn && !lineLoading && !isLiffEnvironment()) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center p-4">
@@ -312,7 +328,6 @@ export default function RegistrationPage() {
               </div>
               <div className="text-sm text-gray-500">
                 <p>接下來請先選擇身分並輸入姓名，再進行 Google 授權。</p>
-                <p className="mt-1">完成 Google 授權後，回到此分頁即可自動檢查並前往首頁。</p>
               </div>
             </CardContent>
           </Card>
@@ -321,7 +336,6 @@ export default function RegistrationPage() {
     )
   }
 
-  // 確認未註冊 → 顯示註冊流程
   if (registrationStatus === 'not_registered') {
     switch (currentStep) {
       case 1:

@@ -250,8 +250,13 @@ export class UserService {
    */
   static async getOnboardStatus(lineUserId: string): Promise<boolean> {
     try {
-      const url = `${this.getOnboardBase()}/onboard/status/${lineUserId}/`
+      // 瀏覽器端：走 Next 代理，避免環境變數缺失與 CORS
+      const url = (typeof window !== 'undefined')
+        ? `/api/onboard/status/${encodeURIComponent(lineUserId)}/`
+        : `${this.getOnboardBase()}/onboard/status/${encodeURIComponent(lineUserId)}/`
+  
       console.log('[UserService] 查詢註冊狀態 URL:', url)
+  
       const controller = new AbortController()
       const timeout = setTimeout(() => controller.abort(), 8000)
       const response = await fetch(url, {
@@ -264,16 +269,18 @@ export class UserService {
         signal: controller.signal,
       })
       clearTimeout(timeout)
+  
       if (!response.ok) {
         console.error('查詢註冊狀態失敗:', response.status, response.statusText)
         return false
       }
-      // 防止收到 HTML（例如 404/錯誤頁）導致 JSON 解析失敗
+  
       const contentType = response.headers.get('content-type') || ''
       if (!contentType.toLowerCase().includes('application/json')) {
         console.error('查詢註冊狀態失敗: 非 JSON 響應', contentType)
         return false
       }
+  
       const data = await response.json()
       return !!(data && (data as any).registered)
     } catch (error) {
