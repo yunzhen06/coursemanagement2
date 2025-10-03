@@ -11,7 +11,7 @@ import { RegistrationRoleSelection } from '@/components/registration-role-select
 import { RegistrationNameInput } from '@/components/registration-name-input'
 import { RegistrationGoogleAuth } from '@/components/registration-google-auth'
 import { Card, CardContent } from '@/components/ui/card'
-import { CheckCircle, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { closeLiffWindow, getIdToken } from '@/lib/line-liff'
 import { isLiffEnvironment } from '@/lib/liff-environment'
 import { Button } from '@/components/ui/button'
@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button'
 export default function RegistrationPage() {
   const router = useRouter()
   const { isLoggedIn, isLoading: lineLoading, login } = useLineAuth()
-  const { authorize: authorizeGoogle, isLoading: googleLoading } = useGoogleAuth()
+  const { isLoading: googleLoading } = useGoogleAuth()
   const {
     currentStep,
     data,
@@ -30,27 +30,31 @@ export default function RegistrationPage() {
     nextStep,
     prevStep,
     completeRegistration,
-    completeRegistrationWithEmail,
     canProceedToNext,
     lineUser
   } = useRegistrationFlow()
 
   // 狀態管理
   const [registrationStatus, setRegistrationStatus] = useState<'checking' | 'not_registered' | 'error'>('checking')
-  // 記住最後一次檢查的使用者 ID；避免因初始假 ID 導致永遠停留在註冊頁
+  // 避免重複以相同 UID 檢查
   const lastCheckedUidRef = useRef<string>('')
 
-  // 已註冊使用者導向守衛：若已綁定則離開註冊頁
+  // 只接受「真實」的 LINE userId 或 callback 已保存的 id，不再產生假 ID
   const uidMemo = useMemo(() => {
-    const uid = lineUser?.userId || ApiService.getLineUserId() || ApiService.bootstrapLineUserId()
-    return uid || ''
+    return lineUser?.userId || ApiService.getLineUserId() || ''
   }, [lineUser?.userId])
 
+  // 檢查是否已註冊
   useEffect(() => {
     const checkRegistration = async () => {
-      if (!uidMemo) return
-      
-      // 只有當使用者 ID 變更時才重新檢查，避免初始假 ID 導致誤判後不再更新
+      if (!uidMemo) {
+        // 還沒有拿到真正的 UID，若非 LIFF 環境就直接讓使用者進入註冊表單
+        if (!isLiffEnvironment()) {
+          setRegistrationStatus('not_registered')
+        }
+        return
+      }
+
       if (lastCheckedUidRef.current === uidMemo) return
       lastCheckedUidRef.current = uidMemo
 
@@ -58,24 +62,19 @@ export default function RegistrationPage() {
       console.log('檢查註冊狀態，LINE User ID:', uidMemo)
 
       try {
-        // 確保後續 API 請求帶入正確的 LINE 使用者 ID
         try { ApiService.setLineUserId(uidMemo) } catch {}
 
         const registered = await UserService.getOnboardStatus(uidMemo)
 
         if (registered) {
           console.log('✅ 用戶已註冊，自動跳轉到應用首頁')
-          // 在 LIFF 內直接關閉視窗；一般瀏覽器導回首頁
           try {
             if (isLiffEnvironment()) {
-              console.log('LIFF 環境：關閉視窗')
               closeLiffWindow()
             } else {
-              console.log('一般瀏覽器：跳轉到首頁')
               router.replace('/')
             }
           } catch {
-            console.log('跳轉失敗，使用備用方案')
             router.replace('/')
           }
           return
@@ -85,7 +84,7 @@ export default function RegistrationPage() {
         }
       } catch (e) {
         console.error('檢查註冊狀態失敗:', e)
-        // 如果檢查失敗，為了安全起見，允許用戶進入註冊流程
+        // 檢查失敗也允許進入註冊流程，避免卡住
         setRegistrationStatus('not_registered')
       }
     }
@@ -93,28 +92,33 @@ export default function RegistrationPage() {
     checkRegistration()
   }, [uidMemo, router])
 
-  // 直接輸入 /registration 的守衛：未登入則引導登入或返回首頁
+  // 只在 LIFF 內，且未登入時才觸發 LINE 授權；外部瀏覽器不阻擋註冊流程
   useEffect(() => {
     if (lineLoading) return
     if (!isLoggedIn) {
-      console.log('未登入，啟動 LINE 登入流程或回首頁')
-      try {
-        login()
-      } catch (e) {
-        console.error('啟動 LINE 登入失敗，導向首頁備援:', e)
-        router.replace('/')
+      if (isLiffEnvironment()) {
+        console.log('LIFF 環境且未登入，啟動 LINE 登入流程')
+        try {
+          login()
+        } catch (e) {
+          console.error('啟動 LINE 登入失敗，導向首頁備援:', e)
+          router.replace('/')
+        }
+      } else {
+        // 外部瀏覽器：讓使用者可直接走註冊表單（例如先填身分/姓名，再做 Google 授權）
+        if (registrationStatus === 'checking') {
+          setRegistrationStatus('not_registered')
+        }
       }
     }
-  }, [lineLoading, isLoggedIn, login, router])
+  }, [lineLoading, isLoggedIn, login, router, registrationStatus])
 
-
-
-  // Google 授權處理
+  // Google 授權
   const handleGoogleAuth = async () => {
     try {
       const role = data.role ?? undefined
       const name = data.name || ''
-      
+
       // LIFF 環境優先使用預註冊，否則直接取得 OAuth 連結
       let redirectUrl = ''
       if (isLiffEnvironment() && lineUser?.userId && role && name) {
@@ -127,26 +131,25 @@ export default function RegistrationPage() {
         const d: any = resp?.data || resp || {}
         redirectUrl = d.redirectUrl || d.auth_url || d.url || ''
       }
-      
+
       if (!redirectUrl) {
         const resp = await ApiService.getGoogleOAuthUrl({ role, name })
         const d: any = resp?.data || resp || {}
         redirectUrl = d.redirectUrl || d.auth_url || d.url || ''
       }
-      
+
       if (!redirectUrl) {
         alert('後端未回傳 redirectUrl')
         return
       }
-      
-      // 在 LIFF：用外部瀏覽器開啟；非 LIFF：整頁導向
+
+      // 在 LIFF：外部瀏覽器開啟；非 LIFF：整頁導向
       if (typeof window !== 'undefined' && (window as any).liff?.openWindow) {
         (window as any).liff.openWindow({ url: redirectUrl, external: true })
       } else {
         window.location.href = redirectUrl
       }
-      
-      // 進入等待授權狀態（僅提示，不做輪詢）
+
       console.log('已開啟 Google 授權，請完成後返回應用程式')
     } catch (error) {
       console.error('Google 授權失敗:', error)
@@ -156,7 +159,6 @@ export default function RegistrationPage() {
   const handleComplete = async () => {
     const success = await completeRegistration()
     if (success) {
-      // 註冊成功後：立即跳轉，不保留於註冊頁面
       try {
         if (isLiffEnvironment()) {
           closeLiffWindow()
@@ -170,7 +172,8 @@ export default function RegistrationPage() {
     }
   }
 
-  // 載入中狀態
+  // ===== UI 狀態 =====
+
   if (lineLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
@@ -182,9 +185,6 @@ export default function RegistrationPage() {
     )
   }
 
-
-
-  // 檢查狀態載入中
   if (registrationStatus === 'checking') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
@@ -196,7 +196,6 @@ export default function RegistrationPage() {
     )
   }
 
-  // 檢查狀態錯誤
   if (registrationStatus === 'error') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center p-4">
@@ -208,11 +207,7 @@ export default function RegistrationPage() {
               </div>
               <h2 className="text-lg font-semibold text-red-800 mb-2">檢查狀態失敗</h2>
               <p className="text-red-600 text-sm">無法確認註冊狀態，請重新整理頁面</p>
-              <Button 
-                onClick={() => window.location.reload()}
-                className="mt-4"
-                variant="outline"
-              >
+              <Button onClick={() => window.location.reload()} className="mt-4" variant="outline">
                 重新整理
               </Button>
             </CardContent>
@@ -222,9 +217,6 @@ export default function RegistrationPage() {
     )
   }
 
-
-
-  // 註冊完成後：不顯示成功頁，立即跳轉
   if (isCompleted) {
     try {
       if (isLiffEnvironment()) {
@@ -238,7 +230,6 @@ export default function RegistrationPage() {
     return null
   }
 
-  // 錯誤狀態
   if (error) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center p-4">
@@ -257,9 +248,8 @@ export default function RegistrationPage() {
     )
   }
 
-  // 如果 LINE 未登入，顯示說明（在本地可能已跳過授權）
-  // 本地略過 LIFF 時，不阻擋註冊流程，讓使用者可直接選擇身分
-  if (!isLoggedIn && !lineLoading) {
+  // 外部瀏覽器、或 LIFF 尚未登入時的提示（但不阻擋流程）
+  if (!isLoggedIn && !lineLoading && !isLiffEnvironment()) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center p-4">
         <div className="w-full max-w-md">
@@ -267,33 +257,10 @@ export default function RegistrationPage() {
             <CardContent className="p-8 text-center space-y-6">
               <div className="space-y-2">
                 <h1 className="text-2xl font-bold text-gray-900">歡迎使用課程管理系統</h1>
-                <p className="text-gray-600">正在前往 LINE 授權頁面</p>
+                <p className="text-gray-600">您正在外部瀏覽器中進行註冊。</p>
               </div>
-              
-              <div className="space-y-4">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <span className="text-blue-600">📱</span>
-                    <span className="text-sm font-medium text-blue-800">LINE 登入授權</span>
-                  </div>
-                  <p className="text-xs text-blue-700">
-                    系統會自動為您導向 LINE 登入授權。若未自動跳轉，請從 LINE 內再次開啟此頁，或重新整理。
-                  </p>
-                </div>
-                
-                <div className="text-sm text-gray-500">
-                  <p>授權後您可以：</p>
-                  <ul className="mt-2 space-y-1 text-left">
-                    <li>• 接收課程提醒通知</li>
-                    <li>• 使用 LINE Bot 功能選單</li>
-                    <li>• 同步 Google Classroom</li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-center space-x-2 text-gray-500">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="text-sm">等待導向至 LINE 授權...</span>
+              <div className="text-sm text-gray-500">
+                <p>接下來請先選擇身分並輸入姓名，再進行 Google 授權。</p>
               </div>
             </CardContent>
           </Card>
@@ -302,28 +269,8 @@ export default function RegistrationPage() {
     )
   }
 
-  // 如果 LINE 正在載入，顯示載入狀態
-  if (lineLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center p-4">
-        <div className="w-full max-w-md">
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-8 text-center space-y-4">
-              <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-600" />
-              <div className="space-y-2">
-                <h2 className="text-lg font-semibold text-gray-900">正在連接 LINE</h2>
-                <p className="text-sm text-gray-600">請稍候...</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    )
-  }
-
-  // 只有在確認未註冊時才顯示註冊流程
+  // 確認未註冊 → 顯示註冊流程
   if (registrationStatus === 'not_registered') {
-    // 根據當前步驟渲染對應頁面
     switch (currentStep) {
       case 1:
         return (
@@ -334,7 +281,6 @@ export default function RegistrationPage() {
             canProceed={canProceedToNext()}
           />
         )
-
       case 2:
         return (
           <RegistrationNameInput
@@ -346,7 +292,6 @@ export default function RegistrationPage() {
             canProceed={canProceedToNext()}
           />
         )
-
       case 3:
         return (
           <RegistrationGoogleAuth
@@ -361,12 +306,10 @@ export default function RegistrationPage() {
             onPrev={prevStep}
           />
         )
-
       default:
         return null
     }
   }
 
-  // 預設返回 null（不應該到達這裡）
   return null
 }

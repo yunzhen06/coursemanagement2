@@ -32,6 +32,9 @@ const nextConfig = {
       { source: '/api/csrf', destination: `${apiBaseUrl}/api/csrf/` },
       // 媒體檔案
       { source: '/media/:path*', destination: `${apiBaseUrl}/media/:path*` },
+      // 後端常丟回 /api/auth/google?... → 轉到 /auth/google/callback（你的前端頁面）
+      { source: '/api/auth/google',        destination: '/auth/google/callback' },
+      { source: '/api/auth/google/:path*', destination: '/auth/google/callback' },
     ]
   },
   async headers() {
